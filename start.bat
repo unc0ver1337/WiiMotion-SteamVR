@@ -33,7 +33,7 @@ if not exist "%VRPATHREG%" (
   pause & exit /b 1
 )
 for %%I in ("%VRPATHREG%") do set "VRBIN=%%~dpI"
-"%VRPATHREG%" | find /i "wiimotionsteamvr" >nul
+"%VRPATHREG%" | find /i "%PKG%" >nul
 if errorlevel 1 (
   echo SteamVR driver is not installed. Install now? [Y/N]
   choice /c YN /n
