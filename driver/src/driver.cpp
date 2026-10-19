@@ -131,7 +131,7 @@ public:
             } else {
                 menu=(f.buttons&0x1000)!=0;
                 trigger=(f.nunchuk_buttons&2)!=0; grip=(f.nunchuk_buttons&1)!=0;
-                x=f.stick_x; y=f.stick_y;
+                x=f.stick_x; y=f.stick_y; padclick=(x*x+y*y>.001);
             }
             t=trigger?1.:0.;
         }

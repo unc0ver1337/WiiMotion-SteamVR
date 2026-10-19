@@ -9,7 +9,7 @@ Windows x64 SteamVR driver for one Wii Remote Plus and connected original Nunchu
 3. Run start.bat and accept driver registration. Restart SteamVR after installation or updating.
 4. Hold 1 and 2 together once with both hands in the desired neutral pose to recenter.
 
-B: right trigger; A: right grip; D-pad: held right trackpad; Plus: right menu; Minus: left menu. 1: left System; 2: right System. Nunchuk Z: left trigger; C: left grip; stick: left trackpad. System events remain active during the recenter chord.
+B: right trigger; A: right grip; D-pad: held right trackpad; Plus: right menu; Minus: left menu. 1: left System; 2: right System. Nunchuk Z: left trigger; C: left grip; stick: left trackpad, held clicked outside the deadzone. System events remain active during the recenter chord.
 
 ## Tracking
 
