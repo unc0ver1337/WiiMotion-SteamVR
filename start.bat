@@ -15,12 +15,10 @@ if not exist "%BRIDGE%" (
   echo Build the packaged bridge using scripts\build-windows.ps1.
   pause & exit /b 1
 )
-set "STEAM="
-for /f "tokens=2,*" %%A in ('reg query "HKCU\Software\Valve\Steam" /v SteamPath 2^>nul ^| find /i "SteamPath"') do set "STEAM=%%B"
-if not defined STEAM for /f "tokens=2,*" %%A in ('reg query "HKLM\SOFTWARE\WOW6432Node\Valve\Steam" /v InstallPath 2^>nul ^| find /i "InstallPath"') do set "STEAM=%%B"
-if not defined STEAM (echo ERROR: Steam install path not found. Install Steam or repair its registry entry.& pause & exit /b 1)
-set "VRPATHREG=%STEAM%\steamapps\common\SteamVR\bin\win64\vrpathreg.exe"
-if not exist "%VRPATHREG%" (echo ERROR: SteamVR not found. Install SteamVR through Steam.& pause & exit /b 1)
+set "VRPATHREG="
+for /f "usebackq delims=" %%I in (`powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%scripts\find-steamvr.ps1"`) do set "VRPATHREG=%%I"
+if not defined VRPATHREG (echo ERROR: SteamVR was not found in Steam or its registered libraries. Install SteamVR through Steam.& pause & exit /b 1)
+for %%I in ("%VRPATHREG%") do set "VRBIN=%%~dpI"
 "%VRPATHREG%" | find /i "wiimotionsteamvr" >nul
 if errorlevel 1 (
   echo SteamVR driver is not installed. Install now? [Y/N]
@@ -36,7 +34,7 @@ tasklist /fi "imagename eq wii_bridge.exe" | find /i "wii_bridge.exe" >nul
 if errorlevel 1 (echo ERROR: HID bridge failed to start. Check logs\bridge.log.& pause & exit /b 1)
 tasklist /fi "imagename eq vrserver.exe" | find /i "vrserver.exe" >nul
 if errorlevel 1 (
-  set "STEAMVR=%STEAM%\steamapps\common\SteamVR\bin\win64\vrstartup.exe"
+  set "STEAMVR=%VRBIN%vrstartup.exe"
   if exist "%STEAMVR%" start "SteamVR" "%STEAMVR%"
 )
 echo HID bridge is running. SteamVR will enumerate WiiRemotePlus-R and WiiNunchuk-L.
