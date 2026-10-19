@@ -73,7 +73,27 @@ public:
             if(centerEdge) nunchukCenter_={hand.w,-hand.x,-hand.y,-hand.z};
             hand=multiply(nunchukCenter_,hand);
         }
+        // Physical downward pitch must point the virtual wand downward.
+        hand.x=-hand.x;
         pose_.qRotation=fresh?multiply(qh,hand):qh;
+        // Virtual forearm: rotation changes the endpoint around a fixed elbow.
+        // This is an arm model, not measured translational tracking.
+        if(fresh && hmd.bPoseIsValid) {
+            const double length=.28;
+            const double dx=-length*2*(hand.x*hand.z+hand.w*hand.y);
+            const double dy=-length*2*(hand.y*hand.z-hand.w*hand.x);
+            const double dz=length*2*(hand.x*hand.x+hand.y*hand.y);
+            const double delta[3]={dx,dy,dz};
+            for(int row=0;row<3;++row) {
+                double target=pose_.vecPosition[row];
+                for(int col=0;col<3;++col) target+=m.m[row][col]*delta[col];
+                if(!positionReady_) filteredPosition_[row]=target;
+                const double step=(std::max)(-.015,(std::min)(.015,target-filteredPosition_[row]));
+                filteredPosition_[row]+=step;
+                pose_.vecPosition[row]=filteredPosition_[row];
+            }
+            positionReady_=true;
+        } else positionReady_=false;
         pose_.result=(fresh&&hmd.bPoseIsValid)?TrackingResult_Running_OK:TrackingResult_Running_OutOfRange;
         pose_.poseIsValid=hmd.bPoseIsValid; pose_.deviceIsConnected=true; pose_.willDriftInYaw=true;
         VRServerDriverHost()->TrackedDevicePoseUpdated(id_,pose_,sizeof(pose_));
@@ -86,7 +106,7 @@ public:
                 menu=(b&0x0010)!=0; padclick=(b&0x0f00)!=0;
                 // D-pad as four digital directions, represented on trackpad axes.
                 x=((b&0x0200)?1.:0.)-((b&0x0100)?1.:0.);
-                y=((b&0x0400)?1.:0.)-((b&0x0800)?1.:0.);
+                y=((b&0x0800)?1.:0.)-((b&0x0400)?1.:0.);
             } else {
                 menu=(f.buttons&0x1000)!=0;
                 trigger=(f.nunchuk_buttons&2)!=0; grip=(f.nunchuk_buttons&1)!=0;
@@ -118,6 +138,7 @@ private:
         q.x=copysign(q.x,m.m[2][1]-m.m[1][2]);q.y=copysign(q.y,m.m[0][2]-m.m[2][0]);q.z=copysign(q.z,m.m[1][0]-m.m[0][1]);
         return q;
     }
+    double filteredPosition_[3]{}; bool positionReady_{false};
     HmdQuaternion_t nunchukCenter_{1,0,0,0}; bool centerHeld_{false};
     bool right_; std::string serial_; uint32_t id_{k_unTrackedDeviceIndexInvalid}; PropertyContainerHandle_t container_{};
     VRInputComponentHandle_t system_{},padTouch_{},grip_{},trigger_{},triggerValue_{},padClick_{},menu_{},padX_{},padY_{};
