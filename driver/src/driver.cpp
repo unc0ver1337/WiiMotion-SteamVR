@@ -80,9 +80,14 @@ public:
         // This is an arm model, not measured translational tracking.
         if(fresh && hmd.bPoseIsValid) {
             const double length=.28;
-            const double dx=-length*2*(hand.x*hand.z+hand.w*hand.y);
-            const double dy=-length*2*(hand.y*hand.z-hand.w*hand.x);
-            const double dz=length*2*(hand.x*hand.x+hand.y*hand.y);
+            // An elbow above the wrist gives roll a lateral lever arm too.
+            const double drop=.18;
+            const double dx=-length*2*(hand.x*hand.z+hand.w*hand.y)
+                            -drop*2*(hand.x*hand.y-hand.w*hand.z);
+            const double dy=-length*2*(hand.y*hand.z-hand.w*hand.x)
+                            +drop*2*(hand.x*hand.x+hand.z*hand.z);
+            const double dz=length*2*(hand.x*hand.x+hand.y*hand.y)
+                            -drop*2*(hand.y*hand.z+hand.w*hand.x);
             const double delta[3]={dx,dy,dz};
             for(int row=0;row<3;++row) {
                 double target=pose_.vecPosition[row];
