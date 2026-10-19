@@ -223,7 +223,7 @@ def main():
                 gcfg=cfg.get("gyro",{})
                 gyro=Gyro(gcfg.get("gravity_correction",.015),gcfg.get("sensitivity",1.),gcfg.get("max_rate_rad_s",12.))
                 last=lastgyro=time.monotonic(); reported_nunchuk=False; reported_calibration=False
-                nunchuk_wait=last; reported_missing_nunchuk=False
+                nunchuk_wait=last; reported_missing_nunchuk=False; previous_buttons=0
                 while True:
                     report=remote.read(64,100); now=time.monotonic()
                     if report and report[0] in (0x20,0x30,0x31): write_report(remote,[0x12,0x04,REPORT])
@@ -232,10 +232,11 @@ def main():
                         if now-lastgyro>1.0: raise RuntimeError("No valid MotionPlus gyro packets for one second; retrying device")
                         continue
                     last=now; buttons=decode_buttons(report)
+                    if buttons & ~previous_buttons & 0x0083: gyro.recenter()
+                    previous_buttons=buttons
                     if d is not None and d[5]&2:
                         accel=tuple(float(v) for v in report[3:6])
                         if gyro.update(d,now,accel): lastgyro=now
-                        if buttons&0x0080: gyro.recenter()
                     elif d is not None:
                         nunchuk=decode_nunchuk(d); nc_seen=now
                         if not reported_nunchuk:

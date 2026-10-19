@@ -22,9 +22,10 @@ public:
         props->SetStringProperty(container_,Prop_ModelNumber_String,right_?"Wii Remote Plus":"Nunchuk (Wii Remote Plus)");
         props->SetStringProperty(container_,Prop_SerialNumber_String,serial_.c_str());
         props->SetStringProperty(container_,Prop_ManufacturerName_String,"Nintendo / WiiMotionSteamVR");
-        props->SetStringProperty(container_,Prop_ControllerType_String,"wiimotionsteamvr_controller");
+        props->SetStringProperty(container_,Prop_RenderModelName_String,"vr_controller_vive_1_5");
+        props->SetStringProperty(container_,Prop_ControllerType_String,"vive_controller");
         props->SetInt32Property(container_,Prop_ControllerRoleHint_Int32,right_?TrackedControllerRole_RightHand:TrackedControllerRole_LeftHand);
-        props->SetStringProperty(container_,Prop_InputProfilePath_String,"{wiimotionsteamvr}/input/wii_controller_profile.json");
+        props->SetStringProperty(container_,Prop_InputProfilePath_String,"{htc}/input/vive_controller_profile.json");
         VRDriverInput()->CreateBooleanComponent(container_,right_?"/input/grip/click":"/input/grip/click",&grip_);
         VRDriverInput()->CreateBooleanComponent(container_,"/input/trigger/click",&trigger_);
         VRDriverInput()->CreateScalarComponent(container_,"/input/trigger/value",&triggerValue_,VRScalarType_Absolute,VRScalarUnits_NormalizedOneSided);
@@ -32,6 +33,8 @@ public:
         VRDriverInput()->CreateBooleanComponent(container_,"/input/menu/click",&menu_);
         VRDriverInput()->CreateScalarComponent(container_,"/input/trackpad/x",&padX_,VRScalarType_Absolute,VRScalarUnits_NormalizedTwoSided);
         VRDriverInput()->CreateScalarComponent(container_,"/input/trackpad/y",&padY_,VRScalarType_Absolute,VRScalarUnits_NormalizedTwoSided);
+        VRDriverInput()->CreateBooleanComponent(container_,"/input/system/click",&system_);
+        VRDriverInput()->CreateBooleanComponent(container_,"/input/trackpad/touch",&padTouch_);
         return VRInitError_None;
     }
     void Deactivate() override { id_=k_unTrackedDeviceIndexInvalid; }
@@ -56,7 +59,17 @@ public:
             pose_.vecPosition[0]=right_?.28:-.28; pose_.vecPosition[1]=-.22; pose_.vecPosition[2]=-.48;
         }
         const HmdQuaternion_t qi{f.q_w,f.q_x,f.q_y,f.q_z};
-        pose_.qRotation=(fresh&&right_)?multiply(qh,qi):qh;
+        HmdQuaternion_t hand=qi;
+        if(!right_) {
+            const double ax=f.nunchuk_ax,ay=f.nunchuk_ay,az=f.nunchuk_az;
+            const double n=sqrt(ax*ax+ay*ay+az*az);
+            if(n>.5 && (f.flags&wms::kFlagNunchuk)) {
+                const double w=1.+ay/n, x=-az/n, z=ax/n;
+                const double qn=sqrt(w*w+x*x+z*z);
+                if(qn>1e-5) hand={w/qn,x/qn,0,z/qn}; else hand={0,1,0,0};
+            } else hand={1,0,0,0};
+        }
+        pose_.qRotation=fresh?multiply(qh,hand):qh;
         pose_.result=(fresh&&hmd.bPoseIsValid)?TrackingResult_Running_OK:TrackingResult_Running_OutOfRange;
         pose_.poseIsValid=hmd.bPoseIsValid; pose_.deviceIsConnected=true; pose_.willDriftInYaw=true;
         VRServerDriverHost()->TrackedDevicePoseUpdated(id_,pose_,sizeof(pose_));
@@ -66,16 +79,19 @@ public:
         if(fresh) {
             if(right_) {
                 const auto b=f.buttons; trigger=(b&0x0004)!=0; grip=(b&0x0008)!=0;
-                menu=(b&0x1000)!=0; padclick=(b&0x0001)!=0;
+                menu=(b&0x0010)!=0; padclick=(b&0x0f00)!=0;
                 // D-pad as four digital directions, represented on trackpad axes.
                 x=((b&0x0200)?1.:0.)-((b&0x0100)?1.:0.);
                 y=((b&0x0800)?1.:0.)-((b&0x0400)?1.:0.);
             } else {
+                menu=(f.buttons&0x1000)!=0;
                 trigger=(f.nunchuk_buttons&2)!=0; grip=(f.nunchuk_buttons&1)!=0;
                 x=f.stick_x; y=f.stick_y;
             }
             t=trigger?1.:0.;
         }
+        VRDriverInput()->UpdateBooleanComponent(system_,fresh && (f.buttons & (right_?0x0001:0x0002)),0);
+        VRDriverInput()->UpdateBooleanComponent(padTouch_,fresh && (right_?padclick:(x*x+y*y>.001)),0);
         VRDriverInput()->UpdateBooleanComponent(trigger_,trigger,0);
         VRDriverInput()->UpdateScalarComponent(triggerValue_,float(t),0);
         VRDriverInput()->UpdateBooleanComponent(grip_,grip,0);
@@ -99,7 +115,7 @@ private:
         return q;
     }
     bool right_; std::string serial_; uint32_t id_{k_unTrackedDeviceIndexInvalid}; PropertyContainerHandle_t container_{};
-    VRInputComponentHandle_t grip_{},trigger_{},triggerValue_{},padClick_{},menu_{},padX_{},padY_{};
+    VRInputComponentHandle_t system_{},padTouch_{},grip_{},trigger_{},triggerValue_{},padClick_{},menu_{},padX_{},padY_{};
     DriverPose_t pose_{};
 };
 
