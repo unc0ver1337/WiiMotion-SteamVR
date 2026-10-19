@@ -1,4 +1,3 @@
-#define NOMINMAX
 #include <windows.h>
 #include <openvr_driver.h>
 #include "pipe_client.hpp"
@@ -21,7 +20,7 @@ public:
         id_=id; auto props=VRProperties(); container_=props->TrackedDeviceToPropertyContainer(id);
         props->SetStringProperty(container_,Prop_TrackingSystemName_String,"wiimotionsteamvr");
         props->SetStringProperty(container_,Prop_ModelNumber_String,right_?"Wii Remote Plus":"Nunchuk (Wii Remote Plus)");
-        props->SetStringProperty(container_,Prop_SerialNumber_String,serial_);
+        props->SetStringProperty(container_,Prop_SerialNumber_String,serial_.c_str());
         props->SetStringProperty(container_,Prop_ManufacturerName_String,"Nintendo / WiiMotionSteamVR");
         props->SetStringProperty(container_,Prop_ControllerType_String,"wiimotionsteamvr_controller");
         props->SetInt32Property(container_,Prop_ControllerRoleHint_Int32,right_?TrackedControllerRole_RightHand:TrackedControllerRole_LeftHand);
@@ -92,10 +91,10 @@ private:
     }
     static HmdQuaternion_t from_matrix(const HmdMatrix34_t&m) {
         HmdQuaternion_t q{};
-        q.w=sqrt((std::max)(0.0,1+m.m[0][0]+m.m[1][1]+m.m[2][2]))*.5;
-        q.x=sqrt((std::max)(0.0,1+m.m[0][0]-m.m[1][1]-m.m[2][2]))*.5;
-        q.y=sqrt((std::max)(0.0,1-m.m[0][0]+m.m[1][1]-m.m[2][2]))*.5;
-        q.z=sqrt((std::max)(0.0,1-m.m[0][0]-m.m[1][1]+m.m[2][2]))*.5;
+        q.w=sqrt((std::max)(0.0,1.0+double(m.m[0][0])+double(m.m[1][1])+double(m.m[2][2])))*.5;
+        q.x=sqrt((std::max)(0.0,1.0+double(m.m[0][0])-double(m.m[1][1])-double(m.m[2][2])))*.5;
+        q.y=sqrt((std::max)(0.0,1.0-double(m.m[0][0])+double(m.m[1][1])-double(m.m[2][2])))*.5;
+        q.z=sqrt((std::max)(0.0,1.0-double(m.m[0][0])-double(m.m[1][1])+double(m.m[2][2])))*.5;
         q.x=copysign(q.x,m.m[2][1]-m.m[1][2]);q.y=copysign(q.y,m.m[0][2]-m.m[2][0]);q.z=copysign(q.z,m.m[1][0]-m.m[0][1]);
         return q;
     }
