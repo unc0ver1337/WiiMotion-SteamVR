@@ -41,6 +41,7 @@ def decode_nunchuk(d: bytes):
 class Quaternion:
     def __init__(self): self.w,self.x,self.y,self.z=1.,0.,0.,0.
     def reset(self): self.w,self.x,self.y,self.z=1.,0.,0.,0.
+    def set(self,values): self.w,self.x,self.y,self.z=values
     def multiply(self,b):
         a=(self.w,self.x,self.y,self.z)
         self.w=a[0]*b[0]-a[1]*b[1]-a[2]*b[2]-a[3]*b[3]
@@ -54,24 +55,63 @@ class Quaternion:
         if mag < 1e-9 or dt <= 0 or dt > .1: return
         h=mag*dt/2; s=math.sin(h)/mag
         self.multiply((math.cos(h),*(v*s for v in rates)))
+    def rotate(self,v):
+        w,x,y,z=self.w,self.x,self.y,self.z; a,b,c=v
+        return ((1-2*(y*y+z*z))*a+2*(x*y-w*z)*b+2*(x*z+w*y)*c,
+                2*(x*y+w*z)*a+(1-2*(x*x+z*z))*b+2*(y*z-w*x)*c,
+                2*(x*z-w*y)*a+2*(y*z+w*x)*b+(1-2*(x*x+y*y))*c)
+    @staticmethod
+    def from_to(a,b):
+        dot=sum(x*y for x,y in zip(a,b))
+        if dot < -0.999999: return (0.,1.,0.,0.)
+        q=(1+dot,a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0])
+        n=math.sqrt(sum(x*x for x in q)) or 1
+        return tuple(x/n for x in q)
 
 class Gyro:
-    def __init__(self): self.bias=[0.,0.,0.]; self.count=0; self.ready=False; self.q=Quaternion(); self.last=None
+    def __init__(self,gravity_gain=.015,sensitivity=1.,max_rate=12.):
+        self.bias=[0.,0.,0.]; self.count=0; self.ready=False; self.q=Quaternion(); self.last=None
+        self.samples=[];self.accel_sum=[0.,0.,0.];self.accel_count=0
+        self.gravity_gain=min(.1,max(0.,float(gravity_gain)));self.sensitivity=min(4.,max(.1,float(sensitivity)));self.max_rate=min(20.,max(2.,float(max_rate)))
     def update(self,d,now,accel):
         raw,slow=decode_gyro(d)
         if any(v<1000 or v>15000 for v in raw): return False
         if not self.ready:
             if all(slow):
-                self.count+=1
-                for i,v in enumerate(raw): self.bias[i]+=(v-self.bias[i])/self.count
-                self.ready=self.count>=60
+                self.samples.append(raw);self.samples=self.samples[-5:]
+                stable=len(self.samples)==5 and all(max(c)-min(c)<=30 for c in zip(*self.samples))
+                if stable:
+                    self.count+=1
+                    for i,v in enumerate(raw): self.bias[i]+=(v-self.bias[i])/self.count
+                    av=[float(v-128) for v in accel];an=math.sqrt(sum(v*v for v in av))
+                    if 15<=an<=110:
+                        for i,v in enumerate(av):self.accel_sum[i]+=v
+                        self.accel_count+=1
+                    if self.count>=60:
+                        self.ready=True
+                        if self.accel_count:
+                            av=[v/self.accel_count for v in self.accel_sum];n=math.sqrt(sum(v*v for v in av))
+                            if n>0:self.q.set(Quaternion.from_to(tuple(v/n for v in av),(0.,1.,0.)))
             self.last=now; return True
         dt=now-self.last if self.last is not None else 0; self.last=now
         if not 0<dt<.1: return True
-        rates=[(v-b)/13.768*(1 if s else 2000/440)*math.pi/180 for v,b,s in zip(raw,self.bias,slow)]
+        rates=[(v-b)/13.768*(1 if s else 2000/440)*math.pi/180*self.sensitivity for v,b,s in zip(raw,self.bias,slow)]
         rates=(rates[1],-rates[2],-rates[0]); mag=math.sqrt(sum(v*v for v in rates))
-        if mag>12: rates=[v*12/mag for v in rates]
+        if mag>self.max_rate: rates=[v*self.max_rate/mag for v in rates]
         self.q.integrate(rates,dt)
+        av=tuple(float(v-128) for v in accel);an=math.sqrt(sum(v*v for v in av))
+        if self.gravity_gain and 15<=an<=110:
+            aw=self.q.rotate(tuple(v/an for v in av));ex,ey,ez=-aw[2],0.,aw[0]
+            en=math.sqrt(ex*ex+ey*ey+ez*ez)
+            if en>1e-6:
+                angle=self.gravity_gain*dt*en/2;scale=math.sin(angle)/en
+                corr=(math.cos(angle),ex*scale,ey*scale,ez*scale)
+                q=self.q;self.q.set((corr[0]*q.w-corr[1]*q.x-corr[2]*q.y-corr[3]*q.z,
+                    corr[0]*q.x+corr[1]*q.w+corr[2]*q.z-corr[3]*q.y,
+                    corr[0]*q.y-corr[1]*q.z+corr[2]*q.w+corr[3]*q.x,
+                    corr[0]*q.z+corr[1]*q.y-corr[2]*q.x+corr[3]*q.w))
+                n=math.sqrt(sum(v*v for v in (self.q.w,self.q.x,self.q.y,self.q.z))) or 1
+                self.q.set(tuple(v/n for v in (self.q.w,self.q.x,self.q.y,self.q.z)))
         if all(slow) and mag<.035:
             for i,v in enumerate(raw): self.bias[i]+=(v-self.bias[i])*.0002
         return True
@@ -179,7 +219,9 @@ def main():
                 remote=hid.device(); remote.open_path(devices[0]["path"]); remote.set_nonblocking(False)
                 log.info("Connected Wii Remote PID 0x%04X",devices[0]["product_id"])
                 initialize(remote); log.info("MotionPlus initialized; collecting bias while waiting for valid 0x37 gyro packets")
-                nunchuk=(128,128,512,512,512,False,False); nc_seen=0; gyro=Gyro()
+                nunchuk=(128,128,512,512,512,False,False); nc_seen=0
+                gcfg=cfg.get("gyro",{})
+                gyro=Gyro(gcfg.get("gravity_correction",.015),gcfg.get("sensitivity",1.),gcfg.get("max_rate_rad_s",12.))
                 last=lastgyro=time.monotonic(); reported_nunchuk=False; reported_calibration=False
                 nunchuk_wait=last; reported_missing_nunchuk=False
                 while True:

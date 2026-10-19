@@ -36,6 +36,12 @@ class BridgeTests(unittest.TestCase):
         self.assertTrue(g.ready)
         values=b.FRAME.unpack(b.pack_frame(5,b.CONNECTED|b.HAS_NUNCHUK,123,0x44,g.q,(0,0,1024),(.2,-.3),3))
         self.assertEqual(len(b.FRAME.pack(*values)),64);self.assertEqual((values[0],values[1],values[2],values[4],values[5],values[6]),(b.MAGIC,1,64,5,3,0x44))
+    def test_gravity_initializes_tilt_without_yaw_reference(self):
+        g=b.Gyro()
+        for i in range(70):g.update(gyro(),i*.01,(178,128,128))
+        self.assertTrue(g.ready)
+        rotated=g.q.rotate((1.,0.,0.))
+        self.assertAlmostEqual(rotated[0],0.,places=5);self.assertAlmostEqual(rotated[1],1.,places=5)
     def test_disconnect_frame_clears_actions(self):
         values=b.FRAME.unpack(b.pack_frame(6,0,900,0,b.Quaternion(),(0,0,0),(0,0),0))
         self.assertEqual(values[5],0);self.assertEqual(values[6],0);self.assertEqual(values[-1],0)
