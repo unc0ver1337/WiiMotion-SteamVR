@@ -11,7 +11,7 @@ if not exist "%PKG%\bin\win64\driver_wiimotion.dll" (
   pause & exit /b 1
 )
 if not exist "%BRIDGE%" (
-  echo ERROR: HID bridge executable is missing: %BRIDGE%
+  echo ERROR: HID bridge executable is missing: "%BRIDGE%"
   echo Build the packaged bridge using scripts\build-windows.ps1.
   pause & exit /b 1
 )
@@ -48,8 +48,7 @@ tasklist /fi "imagename eq wii_bridge.exe" | find /i "wii_bridge.exe" >nul
 if errorlevel 1 (echo ERROR: HID bridge failed to start. Check logs\bridge.log.& pause & exit /b 1)
 tasklist /fi "imagename eq vrserver.exe" | find /i "vrserver.exe" >nul
 if errorlevel 1 (
-  set "STEAMVR=%VRBIN%vrstartup.exe"
-  if exist "%STEAMVR%" start "SteamVR" "%STEAMVR%"
+  if exist "%VRBIN%vrstartup.exe" start "SteamVR" "%VRBIN%vrstartup.exe"
 )
 echo HID bridge is running. SteamVR will enumerate WiiRemotePlus-R and WiiNunchuk-L.
 pause
