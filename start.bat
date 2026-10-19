@@ -16,8 +16,22 @@ if not exist "%BRIDGE%" (
   pause & exit /b 1
 )
 set "VRPATHREG="
-for /f "usebackq delims=" %%I in (`powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%scripts\find-steamvr.ps1"`) do set "VRPATHREG=%%I"
-if not defined VRPATHREG (echo ERROR: SteamVR was not found in Steam or its registered libraries. Install SteamVR through Steam.& pause & exit /b 1)
+if not exist "%ROOT%scripts\find-steamvr.ps1" (
+  echo ERROR: SteamVR discovery helper is missing: "%ROOT%scripts\find-steamvr.ps1"
+  echo Re-extract the complete release ZIP. Do not copy start.bat alone.
+  pause & exit /b 1
+)
+for /f "usebackq delims=" %%I in (`powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%scripts\find-steamvr.ps1" 2^>^&1`) do set "VRPATHREG=%%I"
+if not defined VRPATHREG (
+  echo ERROR: SteamVR was not found in Steam or its registered libraries.
+  echo Install SteamVR through Steam, then run this file again.
+  pause & exit /b 1
+)
+if not exist "%VRPATHREG%" (
+  echo ERROR: SteamVR discovery returned a path that does not exist: "%VRPATHREG%"
+  echo Check the Steam library and rerun start.bat.
+  pause & exit /b 1
+)
 for %%I in ("%VRPATHREG%") do set "VRBIN=%%~dpI"
 "%VRPATHREG%" | find /i "wiimotionsteamvr" >nul
 if errorlevel 1 (

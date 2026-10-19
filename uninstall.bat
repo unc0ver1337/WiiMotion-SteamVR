@@ -3,6 +3,11 @@ setlocal EnableExtensions
 cd /d "%~dp0"
 set "ROOT=%~dp0"
 set "VRPATHREG="
+if not exist "%ROOT%scripts\find-steamvr.ps1" (
+  echo ERROR: SteamVR discovery helper is missing: "%ROOT%scripts\find-steamvr.ps1"
+  echo Re-extract the complete release ZIP and retry.
+  pause & exit /b 1
+)
 for /f "usebackq delims=" %%I in (`powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%scripts\find-steamvr.ps1"`) do set "VRPATHREG=%%I"
 if not defined VRPATHREG (echo ERROR: SteamVR was not found; driver registration was not changed.& pause & exit /b 1)
 taskkill /im wii_bridge.exe /f >nul 2>&1
