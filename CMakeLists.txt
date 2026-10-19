@@ -13,9 +13,3 @@ if(NOT EXISTS "${OPENVR_ROOT}/headers/openvr_driver.h")
   message(FATAL_ERROR "OpenVR headers missing. Run scripts/fetch-openvr.ps1 or set OPENVR_ROOT.")
 endif()
 add_subdirectory(driver)
-set(DRIVER_OUT "${CMAKE_BINARY_DIR}/package/driver/wiimotionsteamvr")
-set_target_properties(driver_wiimotion PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${DRIVER_OUT}/bin/win64" LIBRARY_OUTPUT_DIRECTORY "${DRIVER_OUT}/bin/win64")
-add_custom_command(TARGET driver_wiimotion POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/driver/resources" "${DRIVER_OUT}/resources"
-  COMMAND ${CMAKE_COMMAND} -E make_directory "${DRIVER_OUT}/config"
-  COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/config/config.json" "${DRIVER_OUT}/config/config.json")
