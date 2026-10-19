@@ -72,6 +72,7 @@ public:
             } else hand={1,0,0,0};
             if(centerEdge) nunchukCenter_={hand.w,-hand.x,-hand.y,-hand.z};
             hand=multiply(nunchukCenter_,hand);
+            hand.z=-hand.z; // Reverse Nunchuk lateral tilt only.
         }
         // Physical downward pitch must point the virtual wand downward.
         hand.x=-hand.x;
