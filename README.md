@@ -1,47 +1,34 @@
-# WiiMotion-SteamVR
+# WiiMotion-SteamVR 1.0
 
-Windows SteamVR external driver and HID bridge for one Wii Remote Plus with a connected Nunchuk. It registers two `TrackedDeviceClass_Controller` devices: Wii Remote Plus as right hand and Nunchuk as left hand.
+Windows x64 SteamVR driver for one Wii Remote Plus and connected original Nunchuk. Creates two virtual Vive controllers. Includes packaged HID bridge: no Python installation required.
 
-## Status
+## Run
 
-This repository contains a source implementation and Windows CI build. The current development environment has no MSVC/Windows SDK, SteamVR runtime, Bluetooth Wii Remote, or Nunchuk, so a local DLL build and hardware/runtime validation have not been performed. Check the Actions artifact before treating a package as a working release.
+1. Extract the complete release ZIP to a permanent directory, including scripts/.
+2. Pair Wii Remote Plus via Windows Bluetooth; connect Nunchuk and keep both still during calibration.
+3. Run start.bat and accept driver registration. Restart SteamVR after installation or updating.
+4. Hold 1 and 2 together once with both hands in the desired neutral pose to recenter.
 
-## Hardware and tracking limits
+B: right trigger; A: right grip; D-pad: held right trackpad; Plus: right menu; Minus: left menu. 1: left System; 2: right System. Nunchuk Z: left trigger; C: left grip; stick: left trackpad. System events remain active during the recenter chord.
 
-- Windows 10/11 x64; Nintendo Wii Remote Plus, MotionPlus and an original Nunchuk; Bluetooth HID.
-- MotionPlus and Nunchuk use the `0x37` report and the Nunchuk passthrough bit layout.
-- The report sequence and decoder were checked against the existing [Wii-Remote-Xbox-V2 implementation](https://github.com/unc0ver1337/Wii-Remote-Xbox-V2); its Xbox emulation code is not included.
-- Remote orientation is a quaternion integration of gyro rates with low gain gravity correction for pitch/roll. Yaw has no absolute reference and drifts.
-- The Nunchuk has no gyro. Its orientation cannot provide independent 3DoF tracking; its virtual controller follows HMD orientation while its gravity vector is available over IPC.
-- Positions are fixed offsets transformed by the current raw HMD pose. They are emulated, not measured 6DoF.
-- No positional accelerometer integration is used.
+## Tracking
 
-## Install and run
+Wii Remote orientation uses MotionPlus quaternion integration and gravity correction; yaw drifts. Nunchuk tilt uses its accelerometer and has no independent yaw. Both use a virtual forearm model relative to the HMD, not measured positional 6DoF. Translating the hand without rotating it is not tracked.
 
-1. Download and extract the Windows x64 Actions artifact or release package. Keep `start.bat`, `uninstall.bat`, `config`, and `driver` in one directory.
-2. Pair the Wii Remote Plus in Windows Bluetooth settings, then connect the Nunchuk to its extension socket.
-3. Start SteamVR once so it finishes installation. Run `start.bat`; it finds Steam from the registry, checks `vrpathreg`, and asks before adding this external driver.
-4. In SteamVR Controller Settings, load or create bindings for **WiiMotionSteamVR Controller**. The profile defines trackpad, trigger, grip and menu components.
-5. Stop with Ctrl+C in the bridge console. Run `uninstall.bat` to remove only this external driver registration.
+Orientation smoothing uses normalized quaternion interpolation with hemisphere correction: time constants 25 ms right and 45 ms left. Position smoothing uses 35 ms. These are filter settings, not measured total latency. Recenter bypasses orientation smoothing; buttons are not smoothed.
 
-## Source build
+## Validation
 
-Install Visual Studio 2022 C++ build tools, CMake 3.20+, Git, and Python 3.12. Run `scripts\build-windows.ps1` from PowerShell. It fetches Valve's OpenVR headers, builds the HID bridge with PyInstaller and compiles the x64 server driver. Run automated tests with `python -m unittest discover -s tests -v`.
+Windows x64 MSVC and PyInstaller builds run in GitHub Actions with 10 synthetic protocol/math tests. Both devices and Vive bindings have loaded in the local SteamVR runtime. The user confirmed the preceding tracking version works. Final smoothing and chord behavior still require user validation; no measured latency or exhaustive game compatibility is claimed.
 
-## Configuration and diagnostics
+## Configuration and removal
 
-Defaults live in `config/config.json`. The bridge logs discovery and sensor errors to its console. HID reports include a monotonic timestamp and sequence number; SteamVR rejects stale data and clears inputs after 250 ms. Configurable position offsets, binding remaps, gravity fusion tuning and persistent file logging are not yet wired into runtime behavior.
+config/config.json controls bridge retry, logging, stick deadzone and gyro sensitivity/gravity correction. Native hand offsets, mapping and filter constants currently use compiled defaults; other legacy config fields are not active. Run uninstall.bat from the installed package to remove its driver registration.
 
-## Known implementation gaps
+## Build
 
-- Per-hand `input_profile` bindings need validation against the current SteamVR input schema; game bindings may need to be created manually.
-- The current input components update trackpad axes but do not yet expose the standard pose component/profile interaction expected by every game.
-- Configurable offsets are not loaded by the native driver; safe fixed HMD-relative offsets are used.
-- Recenter is currently level-triggered while Home is held and resets the integrated orientation directly.
-- Nunchuk gravity vector is transported but not yet used to rotate its virtual controller.
-- Start/uninstall batches are source scripts and require package layout validation on a SteamVR Windows machine.
-- Hardware tests, SteamVR runtime tests, latency measurements and a Windows build are pending. CI must successfully execute before calling this a release.
+Visual Studio 2022 C++ tools, CMake 3.20+, Python 3.12 and Git are required. Run scripts/build-windows.ps1. CI packages the full release directory. Tests: python -m unittest discover -s tests -v.
 
 ## License
 
-Project code: MIT. The OpenVR SDK is fetched from Valve's official repository during build and is not vendored. `hidapi` is distributed under its upstream BSD license; PyInstaller is GPLv2 with a bootloader exception. Nintendo and SteamVR are trademarks of their owners.
+MIT project code. OpenVR headers are fetched from Valve at a pinned revision. hidapi uses its upstream BSD license; PyInstaller uses GPL with bootloader exception. Nintendo, HTC Vive and SteamVR belong to their respective owners.

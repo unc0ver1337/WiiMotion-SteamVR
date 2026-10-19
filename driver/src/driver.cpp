@@ -59,7 +59,7 @@ public:
             pose_.vecPosition[0]=right_?.28:-.28; pose_.vecPosition[1]=-.22; pose_.vecPosition[2]=-.48;
         }
         const HmdQuaternion_t qi{f.q_w,f.q_x,f.q_y,f.q_z};
-        const bool center=fresh && (f.buttons&0x0083);
+        const bool center=fresh && ((f.buttons&3)==3);
         const bool centerEdge=center&&!centerHeld_; centerHeld_=center;
         HmdQuaternion_t hand=qi;
         if(!right_) {
@@ -75,6 +75,22 @@ public:
         }
         // Physical downward pitch must point the virtual wand downward.
         hand.x=-hand.x;
+        const auto sampleTime=Clock::now();
+        double dt=std::chrono::duration<double>(sampleTime-lastSmooth_).count(); lastSmooth_=sampleTime;
+        dt=(std::max)(0.,(std::min)(.1,dt));
+        const double alpha=1.-exp(-dt/(right_?.025:.045));
+        if(!fresh || !smoothReady_ || centerEdge) smoothHand_=hand;
+        else {
+            const double dot=smoothHand_.w*hand.w+smoothHand_.x*hand.x+smoothHand_.y*hand.y+smoothHand_.z*hand.z;
+            const double sign=dot<0?-1.:1.;
+            smoothHand_={smoothHand_.w*(1-alpha)+sign*hand.w*alpha,
+                         smoothHand_.x*(1-alpha)+sign*hand.x*alpha,
+                         smoothHand_.y*(1-alpha)+sign*hand.y*alpha,
+                         smoothHand_.z*(1-alpha)+sign*hand.z*alpha};
+            const double n=sqrt(smoothHand_.w*smoothHand_.w+smoothHand_.x*smoothHand_.x+smoothHand_.y*smoothHand_.y+smoothHand_.z*smoothHand_.z);
+            if(n>1e-9) smoothHand_={smoothHand_.w/n,smoothHand_.x/n,smoothHand_.y/n,smoothHand_.z/n};
+        }
+        smoothReady_=fresh; hand=smoothHand_;
         pose_.qRotation=fresh?multiply(qh,hand):qh;
         // Virtual forearm: rotation changes the endpoint around a fixed elbow.
         // This is an arm model, not measured translational tracking.
@@ -93,7 +109,7 @@ public:
                 double target=pose_.vecPosition[row];
                 for(int col=0;col<3;++col) target+=m.m[row][col]*delta[col];
                 if(!positionReady_) filteredPosition_[row]=target;
-                const double step=(std::max)(-.015,(std::min)(.015,target-filteredPosition_[row]));
+                const double step=(1.-exp(-dt/.035))*(target-filteredPosition_[row]);
                 filteredPosition_[row]+=step;
                 pose_.vecPosition[row]=filteredPosition_[row];
             }
@@ -143,6 +159,7 @@ private:
         q.x=copysign(q.x,m.m[2][1]-m.m[1][2]);q.y=copysign(q.y,m.m[0][2]-m.m[2][0]);q.z=copysign(q.z,m.m[1][0]-m.m[0][1]);
         return q;
     }
+    Clock::time_point lastSmooth_{Clock::now()}; HmdQuaternion_t smoothHand_{1,0,0,0}; bool smoothReady_{false};
     double filteredPosition_[3]{}; bool positionReady_{false};
     HmdQuaternion_t nunchukCenter_{1,0,0,0}; bool centerHeld_{false};
     bool right_; std::string serial_; uint32_t id_{k_unTrackedDeviceIndexInvalid}; PropertyContainerHandle_t container_{};

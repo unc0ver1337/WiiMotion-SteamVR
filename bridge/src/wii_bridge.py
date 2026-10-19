@@ -232,7 +232,7 @@ def main():
                         if now-lastgyro>1.0: raise RuntimeError("No valid MotionPlus gyro packets for one second; retrying device")
                         continue
                     last=now; buttons=decode_buttons(report)
-                    if buttons & ~previous_buttons & 0x0083: gyro.recenter()
+                    if (buttons & 3)==3 and (previous_buttons & 3)!=3: gyro.recenter()
                     previous_buttons=buttons
                     if d is not None and d[5]&2:
                         accel=tuple(float(v) for v in report[3:6])
