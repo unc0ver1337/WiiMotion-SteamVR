@@ -5,7 +5,7 @@ echo WiiMotionSteamVR startup
 set "ROOT=%~dp0"
 set "PKG=%ROOT%driver\wiimotionsteamvr"
 set "BRIDGE=%PKG%\bin\win64\wii_bridge.exe"
-if not exist "%PKG%\bin\win64\driver_wiimotion.dll" (
+if not exist "%PKG%\bin\win64\driver_wiimotionsteamvr.dll" (
   echo ERROR: SteamVR driver DLL is missing.
   echo Build the Windows x64 package with scripts\build-windows.ps1 or download a release package.
   pause & exit /b 1
