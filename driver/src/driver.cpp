@@ -59,6 +59,8 @@ public:
             pose_.vecPosition[0]=right_?.28:-.28; pose_.vecPosition[1]=-.22; pose_.vecPosition[2]=-.48;
         }
         const HmdQuaternion_t qi{f.q_w,f.q_x,f.q_y,f.q_z};
+        const bool center=fresh && (f.buttons&0x0083);
+        const bool centerEdge=center&&!centerHeld_; centerHeld_=center;
         HmdQuaternion_t hand=qi;
         if(!right_) {
             const double ax=f.nunchuk_ax,ay=f.nunchuk_ay,az=f.nunchuk_az;
@@ -68,6 +70,8 @@ public:
                 const double qn=sqrt(w*w+x*x+z*z);
                 if(qn>1e-5) hand={w/qn,x/qn,0,z/qn}; else hand={0,1,0,0};
             } else hand={1,0,0,0};
+            if(centerEdge) nunchukCenter_={hand.w,-hand.x,-hand.y,-hand.z};
+            hand=multiply(nunchukCenter_,hand);
         }
         pose_.qRotation=fresh?multiply(qh,hand):qh;
         pose_.result=(fresh&&hmd.bPoseIsValid)?TrackingResult_Running_OK:TrackingResult_Running_OutOfRange;
@@ -82,7 +86,7 @@ public:
                 menu=(b&0x0010)!=0; padclick=(b&0x0f00)!=0;
                 // D-pad as four digital directions, represented on trackpad axes.
                 x=((b&0x0200)?1.:0.)-((b&0x0100)?1.:0.);
-                y=((b&0x0800)?1.:0.)-((b&0x0400)?1.:0.);
+                y=((b&0x0400)?1.:0.)-((b&0x0800)?1.:0.);
             } else {
                 menu=(f.buttons&0x1000)!=0;
                 trigger=(f.nunchuk_buttons&2)!=0; grip=(f.nunchuk_buttons&1)!=0;
@@ -114,6 +118,7 @@ private:
         q.x=copysign(q.x,m.m[2][1]-m.m[1][2]);q.y=copysign(q.y,m.m[0][2]-m.m[2][0]);q.z=copysign(q.z,m.m[1][0]-m.m[0][1]);
         return q;
     }
+    HmdQuaternion_t nunchukCenter_{1,0,0,0}; bool centerHeld_{false};
     bool right_; std::string serial_; uint32_t id_{k_unTrackedDeviceIndexInvalid}; PropertyContainerHandle_t container_{};
     VRInputComponentHandle_t system_{},padTouch_{},grip_{},trigger_{},triggerValue_{},padClick_{},menu_{},padX_{},padY_{};
     DriverPose_t pose_{};
