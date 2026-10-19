@@ -181,6 +181,7 @@ def main():
                 initialize(remote); log.info("MotionPlus initialized; collecting bias while waiting for valid 0x37 gyro packets")
                 nunchuk=(128,128,512,512,512,False,False); nc_seen=0; gyro=Gyro()
                 last=lastgyro=time.monotonic(); reported_nunchuk=False; reported_calibration=False
+                nunchuk_wait=last; reported_missing_nunchuk=False
                 while True:
                     report=remote.read(64,100); now=time.monotonic()
                     if report and report[0] in (0x20,0x30,0x31): write_report(remote,[0x12,0x04,REPORT])
@@ -197,6 +198,9 @@ def main():
                         nunchuk=decode_nunchuk(d); nc_seen=now
                         if not reported_nunchuk:
                             log.info("Nunchuk passthrough packets detected"); reported_nunchuk=True
+                    if not reported_nunchuk and not reported_missing_nunchuk and now-nunchuk_wait>3:
+                        log.warning("Nunchuk passthrough not detected; check the extension connector and initialization")
+                        reported_missing_nunchuk=True
                     if now-last>.3: buttons=0; nunchuk=(128,128,512,512,512,False,False)
                     sx,sy,ax,ay,az,c,z=nunchuk
                     if now-nc_seen>.5: c=z=False

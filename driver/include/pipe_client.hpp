@@ -10,7 +10,13 @@ class PipeClient {
 public:
     PipeClient()=default; ~PipeClient(){stop();}
     void start() { running_=true; thread_=std::thread([this]{run();}); }
-    void stop() { running_=false; {std::lock_guard<std::mutex> l(m_);if(pipe_!=INVALID_HANDLE_VALUE){CancelIoEx(pipe_,nullptr);CloseHandle(pipe_);pipe_=INVALID_HANDLE_VALUE;}} if(thread_.joinable()) thread_.join(); }
+    void stop() {
+        running_=false;
+        { std::lock_guard<std::mutex> l(m_); if(pipe_!=INVALID_HANDLE_VALUE) CancelIoEx(pipe_,nullptr); }
+        if(thread_.joinable()) thread_.join();
+        std::lock_guard<std::mutex> l(m_);
+        if(pipe_!=INVALID_HANDLE_VALUE){CloseHandle(pipe_);pipe_=INVALID_HANDLE_VALUE;}
+    }
     Frame latest() { std::lock_guard<std::mutex> l(m_); return frame_; }
 private:
     std::atomic<bool> running_{false}; std::thread thread_; std::mutex m_; HANDLE pipe_{INVALID_HANDLE_VALUE}; Frame frame_{};

@@ -10,6 +10,7 @@ This repository contains a source implementation and Windows CI build. The curre
 
 - Windows 10/11 x64; Nintendo Wii Remote Plus, MotionPlus and an original Nunchuk; Bluetooth HID.
 - MotionPlus and Nunchuk use the `0x37` report and the Nunchuk passthrough bit layout.
+- The report sequence and decoder were checked against the existing [Wii-Remote-Xbox-V2 implementation](https://github.com/unc0ver1337/Wii-Remote-Xbox-V2); its Xbox emulation code is not included.
 - Remote orientation is a quaternion integration of gyro rates with low gain gravity correction for pitch/roll. Yaw has no absolute reference and drifts.
 - The Nunchuk has no gyro. Its orientation cannot provide independent 3DoF tracking; its virtual controller follows HMD orientation while its gravity samples are reported over IPC for further two axis tilt estimation.
 - Positions are fixed offsets transformed by the current raw HMD pose. They are emulated, not measured 6DoF.
