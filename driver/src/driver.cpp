@@ -19,13 +19,13 @@ public:
     EVRInitError Activate(uint32_t id) override {
         id_=id; auto props=VRProperties(); container_=props->TrackedDeviceToPropertyContainer(id);
         props->SetStringProperty(container_,Prop_TrackingSystemName_String,"wiimotionsteamvr");
-        props->SetStringProperty(container_,Prop_ModelNumber_String,right_?"Wii Remote Plus":"Nunchuk (Wii Remote Plus)");
+        props->SetStringProperty(container_,Prop_ModelNumber_String,right_?"Razer Hydra Right (Wii test)":"Razer Hydra Left (Wii test)");
         props->SetStringProperty(container_,Prop_SerialNumber_String,serial_.c_str());
         props->SetStringProperty(container_,Prop_ManufacturerName_String,"Nintendo / WiiMotionSteamVR");
-        props->SetStringProperty(container_,Prop_RenderModelName_String,"vr_controller_vive_1_5");
-        props->SetStringProperty(container_,Prop_ControllerType_String,"vive_controller");
+        props->SetStringProperty(container_,Prop_RenderModelName_String,"{wiimotionsteamvr}hydra_controller");
+        props->SetStringProperty(container_,Prop_ControllerType_String,"hydra_controller");
         props->SetInt32Property(container_,Prop_ControllerRoleHint_Int32,right_?TrackedControllerRole_RightHand:TrackedControllerRole_LeftHand);
-        props->SetStringProperty(container_,Prop_InputProfilePath_String,"{htc}/input/vive_controller_profile.json");
+        props->SetStringProperty(container_,Prop_InputProfilePath_String,"{wiimotionsteamvr}/input/wii_controller_profile.json");
         VRDriverInput()->CreateBooleanComponent(container_,right_?"/input/grip/click":"/input/grip/click",&grip_);
         VRDriverInput()->CreateBooleanComponent(container_,"/input/trigger/click",&trigger_);
         VRDriverInput()->CreateScalarComponent(container_,"/input/trigger/value",&triggerValue_,VRScalarType_Absolute,VRScalarUnits_NormalizedOneSided);
