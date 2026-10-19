@@ -8,5 +8,6 @@ set_target_properties(driver_wiimotion PROPERTIES
   LIBRARY_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/package/driver/wiimotionsteamvr/bin/win64")
 add_custom_command(TARGET driver_wiimotion POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/driver/resources" "${CMAKE_BINARY_DIR}/package/driver/wiimotionsteamvr/resources"
+  COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/driver/driver.vrdrivermanifest" "${CMAKE_BINARY_DIR}/package/driver/wiimotionsteamvr/driver.vrdrivermanifest"
   COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/package/driver/wiimotionsteamvr/config"
   COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/config/config.json" "${CMAKE_BINARY_DIR}/package/driver/wiimotionsteamvr/config/config.json")
