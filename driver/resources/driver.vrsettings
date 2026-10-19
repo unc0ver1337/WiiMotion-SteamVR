@@ -1,0 +1,3 @@
+{
+  "driver_wiimotionsteamvr": { "enable": true, "loadPriority": 1 }
+}

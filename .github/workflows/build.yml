@@ -1,0 +1,46 @@
+name: Windows x64 build
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Fetch OpenVR headers
+        run: |
+          git init work/openvr
+          git -C work/openvr remote add origin https://github.com/ValveSoftware/openvr.git
+          git -C work/openvr fetch --depth 1 origin 0924064316de3effbcd1acf1e309182a2deb1c05
+          git -C work/openvr checkout FETCH_HEAD
+      - name: Install CMake
+        uses: lukka/get-cmake@latest
+      - name: Install Python dependencies
+        run: python -m pip install -r bridge/requirements.txt pyinstaller
+      - name: Run automated tests
+        run: python -m unittest discover -s tests -v
+      - name: Package HID bridge
+        run: python -m PyInstaller --noconfirm --clean --onefile --name wii_bridge --distpath dist/wii_bridge bridge/src/wii_bridge.py
+      - name: Configure and build driver
+        run: |
+          cmake -S . -B build -A x64 -DOPENVR_ROOT=work/openvr
+          cmake --build build --config Release
+      - name: Assemble release package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force build/package/driver/wiimotionsteamvr/bin/win64 | Out-Null
+          Copy-Item dist/wii_bridge/wii_bridge.exe build/package/driver/wiimotionsteamvr/bin/win64/wii_bridge.exe -Force
+          Copy-Item start.bat,uninstall.bat,README.md -Destination build/package -Force
+          Copy-Item config build/package/config -Recurse -Force
+          Compress-Archive -Path build/package/* -DestinationPath build/WiiMotion-SteamVR-windows-x64.zip -Force
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WiiMotion-SteamVR-windows-x64
+          path: build/WiiMotion-SteamVR-windows-x64.zip
+          if-no-files-found: error

@@ -1,0 +1,3 @@
+# Tracking limits
+
+MotionPlus provides angular velocity only. A calibrated gyro can maintain short term orientation. Yaw drift is unavoidable without a magnetic, optical or other absolute reference. Wii Remote accelerometer gravity correction is not yet active in the production bridge. Nunchuk has only an accelerometer, so it cannot independently measure angular velocity or full 3DoF orientation. Neither device measures position. Driver positions are stable offsets transformed by the HMD pose, not Vive-grade 6DoF tracking. Stop using the controller if the emulated pose is unsuitable for safe movement.
