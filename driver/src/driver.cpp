@@ -24,7 +24,7 @@ public:
         props->SetStringProperty(container_,Prop_ManufacturerName_String,"Nintendo / WiiMotionSteamVR");
         props->SetStringProperty(container_,Prop_ControllerType_String,"wiimotionsteamvr_controller");
         props->SetInt32Property(container_,Prop_ControllerRoleHint_Int32,right_?TrackedControllerRole_RightHand:TrackedControllerRole_LeftHand);
-        props->SetStringProperty(container_,Prop_InputProfilePath_String,"{wiimotionsteamvr}/resources/input/wii_controller_profile.json");
+        props->SetStringProperty(container_,Prop_InputProfilePath_String,"{wiimotionsteamvr}/input/wii_controller_profile.json");
         VRDriverInput()->CreateBooleanComponent(container_,right_?"/input/grip/click":"/input/grip/click",&grip_);
         VRDriverInput()->CreateBooleanComponent(container_,"/input/trigger/click",&trigger_);
         VRDriverInput()->CreateScalarComponent(container_,"/input/trigger/value",&triggerValue_,VRScalarType_Absolute,VRScalarUnits_NormalizedOneSided);
@@ -140,3 +140,4 @@ extern "C" __declspec(dllexport) void* HmdDriverFactory(const char* name,int* er
     if(std::strcmp(name,vr::IServerTrackedDeviceProvider_Version)==0)return &g_provider;
     if(error)*error=vr::VRInitError_Init_InterfaceNotFound;return nullptr;
 }
+
