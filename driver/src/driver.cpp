@@ -72,11 +72,10 @@ public:
             } else hand={1,0,0,0};
             if(centerEdge) nunchukCenter_={hand.w,-hand.x,-hand.y,-hand.z};
             hand=multiply(nunchukCenter_,hand);
-            // Mirror the Nunchuk lateral sensor axis into the hand frame.
-            hand.y=-hand.y; hand.z=-hand.z;
         }
         // Physical downward pitch must point the virtual wand downward.
         hand.x=-hand.x;
+        if(right_) {hand.y=-hand.y; hand.z=-hand.z;}
         const auto sampleTime=Clock::now();
         double dt=std::chrono::duration<double>(sampleTime-lastSmooth_).count(); lastSmooth_=sampleTime;
         dt=(std::max)(0.,(std::min)(.1,dt));
@@ -120,7 +119,7 @@ public:
                     if(!accelReady_ || centerEdge) {
                         accelCenter_={tilt.w,-tilt.x,-tilt.y,-tilt.z};accelReady_=true;
                     }
-                    tilt=multiply(accelCenter_,tilt);tilt.x=-tilt.x;
+                    tilt=multiply(accelCenter_,tilt);tilt.x=-tilt.x;tilt.y=-tilt.y;tilt.z=-tilt.z;
                     accelDelta_[0]=-length*2*(tilt.x*tilt.z+tilt.w*tilt.y)-drop*2*(tilt.x*tilt.y-tilt.w*tilt.z);
                     accelDelta_[1]=-length*2*(tilt.y*tilt.z-tilt.w*tilt.x)+drop*2*(tilt.x*tilt.x+tilt.z*tilt.z);
                     accelDelta_[2]=length*2*(tilt.x*tilt.x+tilt.y*tilt.y)-drop*2*(tilt.y*tilt.z+tilt.w*tilt.x);
