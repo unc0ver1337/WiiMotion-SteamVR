@@ -1,7 +1,5 @@
-# Architecture
+# Architecture 2.0
 
-`bridge/src/wii_bridge.py` exclusively opens the Nintendo HID device and performs MotionPlus/Nunchuk initialization, report decoding, bias calibration, quaternion integration and reconnect. It publishes fixed-size version 1 frames over a local Windows named pipe (`\\.\pipe\WiiMotionSteamVR`). Each frame has sequence, monotonic timestamp, connection flags, buttons, quaternion, Nunchuk gravity vector and stick state.
+One hidapi connection reads 0x37 (buttons, remote acceleration and standard extension data). Initialization writes only A400F0=55 and A400FB=00, with acknowledgements. No MotionPlus activation or alternating gyro decoding exists.
 
-`driver/src/driver.cpp` implements Valve OpenVR's `IServerTrackedDeviceProvider` and two `ITrackedDeviceServerDriver` objects. The provider starts a separate pipe reader. SteamVR's `RunFrame` never waits for Bluetooth or pipe I/O; it consumes the latest frame and clears stale controls. Devices have stable serials and role hints.
-
-The driver's frame loop reads the raw HMD pose and transforms fixed shoulder/hand offsets into SteamVR world coordinates. The right controller combines HMD world orientation with the remote gyro orientation; the left follows HMD orientation because Nunchuk has no gyro.
+A worker serves a 48-byte version-3 Named Pipe frame: header, sequence and monotonic timestamp, flags/buttons, normalized Nunchuk gravity vector, stick, C/Z and raw 8-bit remote acceleration. Native SteamVR input updates use a separate pipe reader and reject stale frames after 250 ms. Both hands share tilt-to-quaternion, recenter, smoothing and virtual forearm code.

@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableExtensions
 cd /d "%~dp0"
-echo WiiMotionSteamVR startup
+echo WiiMotionSteamVR 2.0 startup
 set "ROOT=%~dp0"
 set "PKG=%ROOT%driver\wiimotionsteamvr"
 set "BRIDGE=%PKG%\bin\win64\wii_bridge.exe"
@@ -50,5 +50,5 @@ tasklist /fi "imagename eq vrserver.exe" | find /i "vrserver.exe" >nul
 if errorlevel 1 (
   if exist "%VRBIN%vrstartup.exe" start "SteamVR" "%VRBIN%vrstartup.exe"
 )
-echo HID bridge is running. SteamVR will enumerate WiiRemotePlus-R and WiiNunchuk-L.
+echo HID bridge is running. SteamVR will enumerate WiiRemote-R and WiiNunchuk-L.
 pause

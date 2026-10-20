@@ -1,72 +1,47 @@
-import importlib.util, sys, unittest
+import importlib.util,sys,unittest
 from pathlib import Path
-P=Path(__file__).resolve().parents[1]/"bridge/src/wii_bridge.py"
-spec=importlib.util.spec_from_file_location("wii_bridge",P); b=importlib.util.module_from_spec(spec);sys.modules[spec.name]=b;spec.loader.exec_module(b)
-def report(d,buttons=0): return bytes([0x37,(buttons>>8)&255,buttons&255,*([0]*13),*d])
-def gyro(yaw=8063,pitch=8063,roll=8063,slow=(1,1,1)):
-    return bytes([yaw&255,roll&255,pitch&255,((yaw>>8)<<2)|(2 if slow[0] else 0)|(1 if slow[1] else 0),((roll>>8)<<2)|(2 if slow[2] else 0),((pitch>>8)<<2)])
-class BridgeTests(unittest.TestCase):
-    def test_report_mode_length_and_bad_extension(self):
-        self.assertIsNone(b.extension_payload(b""));self.assertIsNone(b.extension_payload(bytes([0x34])+bytes(21)))
-        self.assertIsNone(b.extension_payload(bytes([0x37])+bytes(20)));self.assertIsNone(b.extension_payload(report(bytes(6))))
-        self.assertIsNone(b.extension_payload(report(bytes([255])*6)))
-        bad=bytearray([128,128,80,90,101,0]);bad[5]|=1;self.assertIsNone(b.extension_payload(report(bad)))
-    def test_buttons_and_gyro_fields(self):
-        self.assertEqual(b.decode_buttons(report(bytes([128,128,0,0,1,0]),0x0800)),0x0800)
-        self.assertEqual(b.decode_gyro(gyro(9000,7500,8200))[0],(9000,7500,8200))
-    def test_nunchuk_stick_accel_cz(self):
-        x,y,ax,ay,az,c,z=b.decode_nunchuk(bytes([0,255,100,120,0x80,0xCC]))
-        self.assertEqual((x,y),(0,255));self.assertEqual((ax,ay,az),(400,480,518));self.assertFalse(c);self.assertFalse(z)
-    def test_alternating_packets_retain_nunchuk(self):
-        nc=bytes([10,200,100,120,0x80,0xCC]);state=b.decode_nunchuk(nc);g=gyro()
-        self.assertEqual(b.extension_payload(report(g)),g);self.assertEqual(state,b.decode_nunchuk(nc));self.assertEqual((state[0],state[1]),(10,200))
-    def test_stick_deadzone(self): self.assertEqual(b.axis(128),0);self.assertEqual(b.axis(0),-1);self.assertEqual(b.axis(255),1)
-    def test_accelerometer_gravity_vector(self):
-        self.assertEqual(b.gravity_direction(0,0,0),(0.0,0.0,0.0))
-        gx,gy,gz=b.gravity_direction(0,0,100)
-        self.assertAlmostEqual(gx,0);self.assertAlmostEqual(gy,0);self.assertAlmostEqual(gz,1)
-    def test_quaternion_integration_and_recenter(self):
-        q=b.Quaternion()
-        for _ in range(100):q.integrate((0,1,0),.01)
-        self.assertAlmostEqual(sum(v*v for v in (q.w,q.x,q.y,q.z)),1,places=8);self.assertNotAlmostEqual(abs(q.w),1)
-        q.reset();self.assertEqual((q.w,q.x,q.y,q.z),(1,0,0,0))
-    def test_bias_calibration_and_serialization(self):
-        g=b.Gyro()
-        for i in range(65):g.update(gyro(8050,8100,8200),i*.01,(0,0,1024))
-        self.assertTrue(g.ready)
-        values=b.FRAME.unpack(b.pack_frame(5,b.CONNECTED|b.HAS_NUNCHUK,123,0x44,g.q,(0,0,1024),(.2,-.3),3))
-        self.assertEqual(len(b.FRAME.pack(*values)),64);self.assertEqual((values[0],values[1],values[2],values[4],values[5],values[6]),(b.MAGIC,2,64,5,3,0x44))
-    def test_gravity_initializes_tilt_without_yaw_reference(self):
-        g=b.Gyro()
-        for i in range(70):g.update(gyro(),i*.01,(178,128,128))
-        self.assertTrue(g.ready)
-        rotated=g.q.rotate((1.,0.,0.))
-        self.assertAlmostEqual(rotated[0],0.,places=5);self.assertAlmostEqual(rotated[1],1.,places=5)
-    def test_gyro_yaw_pitch_roll_use_correct_rotation_axes(self):
-        for raw_axis,quaternion_axis in ((0,2),(1,1),(2,3)):
-            g=b.Gyro(gravity_gain=0)
-            for i in range(70):g.update(gyro(8063,8063,8063),i*.01,(128,178,128))
-            self.assertTrue(g.ready);g.recenter()
-            values=[8063,8063,8063];values[raw_axis]+=500
-            g.update(gyro(*values),.70,(128,178,128))
-            q=(g.q.w,g.q.x,g.q.y,g.q.z)
-            self.assertGreater(abs(q[quaternion_axis]),.001)
-            for axis in (1,2,3):
-                if axis!=quaternion_axis:self.assertAlmostEqual(q[axis],0.,places=6)
-    def test_gravity_correction_reduces_tilt_error(self):
-        g=b.Gyro(gravity_gain=1.2)
-        for i in range(70):g.update(gyro(),i*.01,(128,178,128))
-        for _ in range(40):g.q.integrate((.4,0,0),.025)
-        before=abs(g.q.rotate((0,1,0))[2])
-        for i in range(70,370):g.update(gyro(),i*.01,(128,178,128))
-        self.assertLess(abs(g.q.rotate((0,1,0))[2]),before*.15)
-    def test_remote_acceleration_is_separate_from_orientation(self):
-        q=b.Quaternion();q.integrate((.3,.2,-.1),.05)
-        first=b.FRAME.unpack(b.pack_frame(1,b.CONNECTED,100,0,q,(0,1,0),(0,0),0,(100,150,200)))
-        second=b.FRAME.unpack(b.pack_frame(2,b.CONNECTED,200,0,q,(0,1,0),(0,0),0,(200,90,120)))
-        self.assertEqual(first[7:11],second[7:11])
-        self.assertEqual(first[-3:],(100,150,200));self.assertEqual(second[-3:],(200,90,120))
-    def test_disconnect_frame_clears_actions(self):
-        values=b.FRAME.unpack(b.pack_frame(6,0,900,0,b.Quaternion(),(0,0,0),(0,0),0))
-        self.assertEqual(values[5],0);self.assertEqual(values[6],0);self.assertEqual(values[-4],0);self.assertEqual(values[-3:],(128,128,128))
+from unittest.mock import patch
+spec=importlib.util.spec_from_file_location("bridge",Path(__file__).resolve().parents[1]/"bridge/src/wii_bridge.py")
+b=importlib.util.module_from_spec(spec);spec.loader.exec_module(b)
+def report(d,buttons=0):return bytes([0x37,buttons>>8,buttons&255,*([128]*3),*([0]*10),*d])
+class Tests(unittest.TestCase):
+    def test_report_length(self):
+        for r in (b"",bytes([0x37])+bytes(20),bytes([0x34])+bytes(21)):self.assertIsNone(b.extension_payload(r))
+    def test_invalid_extension(self):
+        for d in (bytes(6),bytes([255])*6):self.assertIsNone(b.extension_payload(report(d)))
+    def test_standard_nunchuk_accepts_unpressed_z_bit(self):
+        d=bytes([128,128,128,128,180,3]);self.assertEqual(b.extension_payload(report(d)),d)
+    def test_standard_nunchuk_buttons(self):
+        for bits,c,z in ((0,True,True),(1,True,False),(2,False,True),(3,False,False)):
+            self.assertEqual(b.decode_nunchuk(bytes([128,128,128,128,180,bits]))[-2:],(c,z))
+    def test_standard_nunchuk_all_accel_low_bits(self):
+        self.assertEqual(b.decode_nunchuk(bytes([10,20,100,120,140,0b11100111]))[:5],(10,20,401,482,563))
+    def test_remote_buttons(self):self.assertEqual(b.decode_buttons(report(bytes(6),0x1f9f)),0x1f9f)
+    def test_deadzone(self):
+        self.assertEqual(b.axis(128),0);self.assertEqual(b.axis(131),0);self.assertEqual(b.axis(0),-1);self.assertEqual(b.axis(255),1)
+    def test_gravity(self):
+        self.assertEqual(b.gravity_direction(0,0,0),(0,0,0));self.assertEqual(b.gravity_direction(0,100,0),(0,1,0))
+    def test_ipc_v3_roundtrip(self):
+        p=b.pack_frame(7,3,123,0x44,(.1,.2,.3),(.2,-.4),2,(100,150,200));v=b.FRAME.unpack(p)
+        self.assertEqual(len(p),48);self.assertEqual(v[:7],(b.MAGIC,3,48,123,7,3,0x44));self.assertEqual(v[-4:],(2,100,150,200))
+    def test_disconnect_resets_controls(self):
+        v=b.FRAME.unpack(b.pack_frame(0,0,0,0,(0,0,0),(0,0),0));self.assertEqual(v[5:7],(0,0));self.assertEqual(v[7:13],(0,0,0,0,0,0))
+    def test_initialization_standard_registers_only(self):
+        class Hid:
+            def __init__(self):self.writes=[]
+            def write(self,p):self.writes.append(p);return len(p)
+            def read(self,*args):return [0x22,0,0,0x16,0]
+        h=Hid()
+        with patch.object(b.time,"sleep"):b.initialize(h)
+        self.assertEqual([int.from_bytes(w[1:5],"big") for w in h.writes[:-1]],[0x04a400f0,0x04a400fb])
+        self.assertEqual(h.writes[-1],bytes([0x12,4,0x37]))
+    def test_write_error(self):
+        class Hid:
+            def write(self,p):return len(p)
+            def read(self,*args):return [0x22,0,0,0x16,7]
+        with self.assertRaises(RuntimeError):b.write_register(Hid(),0x04a400f0,0x55)
+    def test_hid_filter(self):
+        class Hid:
+            def enumerate(self,*args):return [{"product_id":0x0306},{"product_id":0x0330},{"product_id":123}]
+        self.assertEqual(len(b.report_devices(Hid())),2)
 if __name__=="__main__":unittest.main()

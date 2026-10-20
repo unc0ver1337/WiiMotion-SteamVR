@@ -1,7 +1,7 @@
 #include <windows.h>
 #include <openvr_driver.h>
 #include "pipe_client.hpp"
-#include "motion.hpp"
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <chrono>
@@ -19,7 +19,7 @@ public:
     EVRInitError Activate(uint32_t id) override {
         id_=id; auto props=VRProperties(); container_=props->TrackedDeviceToPropertyContainer(id);
         props->SetStringProperty(container_,Prop_TrackingSystemName_String,"wiimotionsteamvr");
-        props->SetStringProperty(container_,Prop_ModelNumber_String,right_?"Wii Remote Plus":"Nunchuk (Wii Remote Plus)");
+        props->SetStringProperty(container_,Prop_ModelNumber_String,right_?"Wii Remote":"Nunchuk (Wii Remote)");
         props->SetStringProperty(container_,Prop_SerialNumber_String,serial_.c_str());
         props->SetStringProperty(container_,Prop_ManufacturerName_String,"Nintendo / WiiMotionSteamVR");
         props->SetStringProperty(container_,Prop_RenderModelName_String,"vr_controller_vive_1_5");
@@ -80,20 +80,7 @@ public:
         const double alpha=1.-exp(-dt/.028);
         smoothHand_=filterQuaternion(smoothHand_,hand,alpha,!fresh || !smoothReady_ || centerEdge);
         smoothReady_=fresh; hand=smoothHand_;
-        HmdQuaternion_t aim=hand;
-        if(right_) {
-            HmdQuaternion_t fused{f.q_w,f.q_x,f.q_y,f.q_z};
-            if(centerEdge) fusedCenter_={fused.w,-fused.x,-fused.y,-fused.z};
-            fused=multiply(fusedCenter_,fused); fused.x=-fused.x; fused.y=-fused.y;
-            fusedSmooth_=filterQuaternion(fusedSmooth_,fused,alpha,!fresh || !fusedReady_ || centerEdge);
-            fusedReady_=fresh;
-            // Accelerometer directly anchors tilt; gyro contributes heading only.
-            const auto& q=fusedSmooth_;
-            const double yaw=atan2(2.*(q.w*q.y+q.x*q.z),1.-2.*(q.y*q.y+q.x*q.x));
-            HmdQuaternion_t heading{cos(yaw*.5),0,sin(yaw*.5),0};
-            aim=multiply(heading,hand);
-        }
-        pose_.qRotation=fresh?multiply(qh,aim):qh;
+        pose_.qRotation=fresh?multiply(qh,hand):qh;
         // Virtual forearm: rotation changes the endpoint around a fixed elbow.
         // This is an arm model, not measured translational tracking.
         if(fresh && hmd.bPoseIsValid) {
@@ -172,7 +159,6 @@ private:
         q.x=copysign(q.x,m.m[2][1]-m.m[1][2]);q.y=copysign(q.y,m.m[0][2]-m.m[2][0]);q.z=copysign(q.z,m.m[1][0]-m.m[0][1]);
         return q;
     }
-    HmdQuaternion_t fusedCenter_{1,0,0,0},fusedSmooth_{1,0,0,0}; bool fusedReady_{false};
     Clock::time_point lastSmooth_{Clock::now()}; HmdQuaternion_t smoothHand_{1,0,0,0}; bool smoothReady_{false};
     double filteredPosition_[3]{}; bool positionReady_{false};
     HmdQuaternion_t nunchukCenter_{1,0,0,0}; bool centerHeld_{false};
@@ -185,9 +171,9 @@ class Provider final : public IServerTrackedDeviceProvider {
 public:
     EVRInitError Init(IVRDriverContext* ctx) override {
         VR_INIT_SERVER_DRIVER_CONTEXT(ctx);
-        right_=std::make_unique<WiiController>(true,"WiiRemotePlus-R");
+        right_=std::make_unique<WiiController>(true,"WiiRemote-R");
         left_=std::make_unique<WiiController>(false,"WiiNunchuk-L");
-        if(!VRServerDriverHost()->TrackedDeviceAdded("WiiRemotePlus-R",TrackedDeviceClass_Controller,right_.get()) ||
+        if(!VRServerDriverHost()->TrackedDeviceAdded("WiiRemote-R",TrackedDeviceClass_Controller,right_.get()) ||
            !VRServerDriverHost()->TrackedDeviceAdded("WiiNunchuk-L",TrackedDeviceClass_Controller,left_.get())) {
             right_.reset();left_.reset();VR_CLEANUP_SERVER_DRIVER_CONTEXT();return VRInitError_Driver_Failed;
         }
@@ -201,7 +187,7 @@ public:
         const double age=std::chrono::duration<double>(now.time_since_epoch()).count()*1e9-double(f.timestamp_ns);
         bool fresh=f.magic==wms::kMagic && (f.flags&wms::kFlagConnected) && wms::valid(f) &&
             f.timestamp_ns!=0 && age>=0.0 && age<250000000.0;
-        if(!fresh){f.buttons=0;f.nunchuk_buttons=0;f.stick_x=f.stick_y=0;f.q_w=1;f.q_x=f.q_y=f.q_z=0;}
+        if(!fresh){f.buttons=0;f.nunchuk_buttons=0;f.stick_x=f.stick_y=0;}
         if(right_)right_->update(f,fresh,hmd);if(left_)left_->update(f,fresh,hmd);
     }
     bool ShouldBlockStandbyMode() override { return false; }

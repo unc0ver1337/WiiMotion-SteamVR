@@ -1,3 +1,3 @@
-# Tracking limits
+# Tracking limitations
 
-MotionPlus provides angular velocity only. The bridge estimates the initial tilt from gravity and applies a low gain gravity correction while acceleration is near one g. This correction cannot fix yaw, which drifts without a magnetic, optical or other absolute reference. Nunchuk has only an accelerometer, so it cannot independently measure angular velocity or full 3DoF orientation. Neither device measures position. Driver positions are stable offsets transformed by the HMD pose, not Vive-grade 6DoF tracking. Stop using the controller if the emulated pose is unsuitable for safe movement.
+Both hands use accelerometers only. Tilt is gravity-relative; yaw is unobservable. Virtual forearm positions are HMD-relative estimates, not measured translation. Acceleration from fast gestures affects tilt. No gyroscope, double integration or external position sensor is used.

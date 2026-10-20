@@ -1,5 +1,3 @@
-# Installation
+# Installation 2.0
 
-Use a successful Windows x64 CI artifact. Extract its full folder layout, pair the Wii Remote in Windows Bluetooth settings, connect the Nunchuk, then run `start.bat`. The packaged driver folder includes its root `driver.vrdrivermanifest`. Registration uses SteamVR's `vrpathreg.exe adddriver`; removal uses `removedriver` with the matching driver directory. Steam and all registered library paths are read from Windows registry and `libraryfolders.vdf`, not fixed drive paths. No administrator elevation is requested.
-
-Run SteamVR, inspect its system report and `logs\vrserver.txt` if devices do not appear. The bridge and driver must run in the same Windows user session because the named pipe is local.
+Extract the full release ZIP and run start.bat. Keep the folder fixed after registration. Restart SteamVR after upgrades. Run uninstall.bat before removing the directory. Both bridge and DLL must be from 2.0 because IPC v3 differs from 1.x.

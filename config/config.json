@@ -1,10 +1,5 @@
 {
   "logging_level": "INFO",
   "retry_seconds": 3,
-  "stick_deadzone": 0.08,
-  "recenter_button": "home",
-  "hands": {"remote": "right", "nunchuk": "left"},
-  "controller_offsets_m": {"right": [0.28, -0.22, -0.48], "left": [-0.28, -0.22, -0.48]},
-  "gyro": {"sensitivity": 1.0, "gravity_correction": 0.015, "max_rate_rad_s": 12.0},
-  "button_mapping": {"remote_trigger": "B", "remote_grip": "A", "remote_trackpad_click": "2", "remote_menu": "Plus", "recenter": "Home", "nunchuk_trigger": "Z", "nunchuk_grip": "C", "nunchuk_stick": "trackpad"}
+  "stick_deadzone": 0.08
 }
