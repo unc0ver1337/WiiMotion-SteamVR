@@ -42,6 +42,17 @@ class BridgeTests(unittest.TestCase):
         self.assertTrue(g.ready)
         rotated=g.q.rotate((1.,0.,0.))
         self.assertAlmostEqual(rotated[0],0.,places=5);self.assertAlmostEqual(rotated[1],1.,places=5)
+    def test_gyro_yaw_pitch_roll_use_correct_rotation_axes(self):
+        for raw_axis,quaternion_axis in ((0,2),(1,1),(2,3)):
+            g=b.Gyro(gravity_gain=0)
+            for i in range(70):g.update(gyro(8063,8063,8063),i*.01,(128,178,128))
+            self.assertTrue(g.ready);g.recenter()
+            values=[8063,8063,8063];values[raw_axis]+=500
+            g.update(gyro(*values),.70,(128,178,128))
+            q=(g.q.w,g.q.x,g.q.y,g.q.z)
+            self.assertGreater(abs(q[quaternion_axis]),.001)
+            for axis in (1,2,3):
+                if axis!=quaternion_axis:self.assertAlmostEqual(q[axis],0.,places=6)
     def test_remote_acceleration_is_separate_from_orientation(self):
         q=b.Quaternion();q.integrate((.3,.2,-.1),.05)
         first=b.FRAME.unpack(b.pack_frame(1,b.CONNECTED,100,0,q,(0,1,0),(0,0),0,(100,150,200)))

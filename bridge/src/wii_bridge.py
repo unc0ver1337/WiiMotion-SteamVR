@@ -96,7 +96,7 @@ class Gyro:
         dt=now-self.last if self.last is not None else 0; self.last=now
         if not 0<dt<.1: return True
         rates=[(v-b)/13.768*(1 if s else 2000/440)*math.pi/180*self.sensitivity for v,b,s in zip(raw,self.bias,slow)]
-        rates=(rates[1],-rates[2],-rates[0]); mag=math.sqrt(sum(v*v for v in rates))
+        rates=(rates[1],-rates[0],-rates[2]); mag=math.sqrt(sum(v*v for v in rates))
         if mag>self.max_rate: rates=[v*self.max_rate/mag for v in rates]
         self.q.integrate(rates,dt)
         av=tuple(float(v-128) for v in accel);an=math.sqrt(sum(v*v for v in av))
