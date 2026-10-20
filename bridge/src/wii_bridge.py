@@ -218,10 +218,9 @@ def main():
                 # Enumeration is VID/PID filtered; a process-wide mutex prevents a second bridge opening HID.
                 remote=hid.device(); remote.open_path(devices[0]["path"]); remote.set_nonblocking(False)
                 log.info("Connected Wii Remote PID 0x%04X",devices[0]["product_id"])
-                initialize(remote); log.info("MotionPlus initialized; collecting bias while waiting for valid 0x37 gyro packets")
+                initialize(remote); log.info("Accelerometer-only mode; MotionPlus passthrough retained for Nunchuk transport")
                 nunchuk=(128,128,512,512,512,False,False); nc_seen=0
-                gcfg=cfg.get("gyro",{})
-                gyro=Gyro(gcfg.get("gravity_correction",.015),gcfg.get("sensitivity",1.),gcfg.get("max_rate_rad_s",12.))
+                orientation=Quaternion()
                 last=lastgyro=time.monotonic(); reported_nunchuk=False; reported_calibration=False
                 nunchuk_wait=last; reported_missing_nunchuk=False; previous_buttons=0
                 while True:
@@ -232,11 +231,10 @@ def main():
                         if now-lastgyro>1.0: raise RuntimeError("No valid MotionPlus gyro packets for one second; retrying device")
                         continue
                     last=now; buttons=decode_buttons(report)
-                    if (buttons & 3)==3 and (previous_buttons & 3)!=3: gyro.recenter()
+                    if (buttons & 3)==3 and (previous_buttons & 3)!=3: orientation.reset()
                     previous_buttons=buttons
                     if d is not None and d[5]&2:
-                        accel=tuple(float(v) for v in report[3:6])
-                        if gyro.update(d,now,accel): lastgyro=now
+                        lastgyro=now # transport health only; angular-rate values are unused
                     elif d is not None:
                         nunchuk=decode_nunchuk(d); nc_seen=now
                         if not reported_nunchuk:
@@ -250,11 +248,9 @@ def main():
                     nc_buttons=int(c)|(int(z)<<1)
                     flags=CONNECTED|(HAS_NUNCHUK if now-nc_seen<.5 else 0)
                     dz=min(.45,max(0.,float(cfg.get("stick_deadzone",.08))))
-                    packet=pack_frame(seq,flags,time.perf_counter_ns(),buttons,gyro.q,gravity_direction(ax-512,ay-512,az-512),(axis(sx,dz=dz),axis(sy,dz=dz)),nc_buttons,report[3:6])
+                    packet=pack_frame(seq,flags,time.perf_counter_ns(),buttons,orientation,gravity_direction(ax-512,ay-512,az-512),(axis(sx,dz=dz),axis(sy,dz=dz)),nc_buttons,report[3:6])
                     seq=(seq+1)&0xffffffff
                     with latest_lock:latest_packet=packet
-                    if gyro.ready and not reported_calibration:
-                        log.info("Gyroscope bias calibrated");reported_calibration=True
                     if now-lastgyro>1.0: raise RuntimeError("No valid MotionPlus gyro packets for one second; retrying device")
             except KeyboardInterrupt:
                 break

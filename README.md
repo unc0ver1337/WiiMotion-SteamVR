@@ -36,3 +36,5 @@ MIT project code. OpenVR headers are fetched from Valve at a pinned revision. hi
 Right-hand acceleration gesture mode: IPC v2 carries raw remote acceleration. Aim remains gyro based; right-hand translation uses a damped, bounded acceleration response (18 cm per axis) that returns to neutral. This is virtual gesture displacement, not persistent measured position. Recenter 1+2 clears displacement.
 
 Current filter tuning: right gyro orientation 20 ms, Nunchuk tilt orientation 28 ms, both positions 22 ms exponential time constants. Recenter resets orientation filtering. Nunchuk lateral direction is preserved; right-hand lateral orientation and accelerometer position are mirrored to match it. These constants are not measured end-to-end latency.
+
+Current mode: accelerometer-only on BOTH hands, with identical tilt-to-orientation, virtual arm positioning, 28 ms tilt filtering and 22 ms position filtering. Gyroscope integration and bias calibration are not used at runtime. MotionPlus passthrough is retained only for the HID transport. Neither hand has measured independent yaw in this mode.

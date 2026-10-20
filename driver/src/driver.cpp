@@ -58,24 +58,22 @@ public:
         } else {
             pose_.vecPosition[0]=right_?.28:-.28; pose_.vecPosition[1]=-.22; pose_.vecPosition[2]=-.48;
         }
-        const HmdQuaternion_t qi{f.q_w,f.q_x,f.q_y,f.q_z};
         const bool center=fresh && ((f.buttons&3)==3);
         const bool centerEdge=center&&!centerHeld_; centerHeld_=center;
-        HmdQuaternion_t hand=qi;
-        if(!right_) {
-            const double ax=f.nunchuk_ax,ay=f.nunchuk_ay,az=f.nunchuk_az;
-            const double n=sqrt(ax*ax+ay*ay+az*az);
-            if(n>.5 && (f.flags&wms::kFlagNunchuk)) {
-                const double w=1.+ay/n, x=-az/n, z=ax/n;
-                const double qn=sqrt(w*w+x*x+z*z);
-                if(qn>1e-5) hand={w/qn,x/qn,0,z/qn}; else hand={0,1,0,0};
-            } else hand={1,0,0,0};
-            if(centerEdge) nunchukCenter_={hand.w,-hand.x,-hand.y,-hand.z};
-            hand=multiply(nunchukCenter_,hand);
+        HmdQuaternion_t hand{1,0,0,0};
+        const double ax=right_?double(f.remote_accel[0])-128.:f.nunchuk_ax;
+        const double ay=right_?double(f.remote_accel[1])-128.:f.nunchuk_ay;
+        const double az=right_?double(f.remote_accel[2])-128.:f.nunchuk_az;
+        const double n=sqrt(ax*ax+ay*ay+az*az);
+        if(n>(right_?15.:.5)) {
+            const double w=1.+ay/n,x=-az/n,z=ax/n;
+            const double qn=sqrt(w*w+x*x+z*z);
+            hand=qn>1e-5?HmdQuaternion_t{w/qn,x/qn,0,z/qn}:HmdQuaternion_t{0,1,0,0};
         }
+        if(centerEdge) nunchukCenter_={hand.w,-hand.x,-hand.y,-hand.z};
+        hand=multiply(nunchukCenter_,hand);
         // Physical downward pitch must point the virtual wand downward.
         hand.x=-hand.x;
-        if(right_) hand.y=-hand.y; // Reverse gyro yaw only, not accelerometer position.
         const auto sampleTime=Clock::now();
         double dt=std::chrono::duration<double>(sampleTime-lastSmooth_).count(); lastSmooth_=sampleTime;
         dt=(std::max)(0.,(std::min)(.1,dt));
@@ -96,29 +94,6 @@ public:
             const double dz=length*2*(hand.x*hand.x+hand.y*hand.y)
                             -drop*2*(hand.y*hand.z+hand.w*hand.x);
             double delta[3]={dx,dy,dz};
-            if(right_) {
-                // Same accelerometer tilt arm model as Nunchuk; gyro still aims.
-                const double ax=double(f.remote_accel[0])-128.;
-                const double ay=double(f.remote_accel[1])-128.;
-                const double az=double(f.remote_accel[2])-128.;
-                const double n=sqrt(ax*ax+ay*ay+az*az);
-                if(n>15. && n<110.) {
-                    const double w=1.+ay/n,x=-az/n,z=ax/n;
-                    const double qn=sqrt(w*w+x*x+z*z);
-                    HmdQuaternion_t tilt=qn>1e-5?HmdQuaternion_t{w/qn,x/qn,0,z/qn}:HmdQuaternion_t{0,1,0,0};
-                    const bool resetTilt=!accelReady_ || centerEdge;
-                    if(resetTilt) {
-                        accelCenter_={tilt.w,-tilt.x,-tilt.y,-tilt.z};accelReady_=true;
-                    }
-                    tilt=multiply(accelCenter_,tilt);tilt.x=-tilt.x;
-                    filteredAccelTilt_=filterQuaternion(filteredAccelTilt_,tilt,alpha,resetTilt);
-                    tilt=filteredAccelTilt_;
-                    accelDelta_[0]=-length*2*(tilt.x*tilt.z+tilt.w*tilt.y)-drop*2*(tilt.x*tilt.y-tilt.w*tilt.z);
-                    accelDelta_[1]=-length*2*(tilt.y*tilt.z-tilt.w*tilt.x)+drop*2*(tilt.x*tilt.x+tilt.z*tilt.z);
-                    accelDelta_[2]=length*2*(tilt.x*tilt.x+tilt.y*tilt.y)-drop*2*(tilt.y*tilt.z+tilt.w*tilt.x);
-                }
-                for(int i=0;i<3;++i) delta[i]=accelDelta_[i];
-            }
             for(int row=0;row<3;++row) {
                 double target=pose_.vecPosition[row];
                 for(int col=0;col<3;++col) target+=m.m[row][col]*delta[col];
@@ -128,7 +103,7 @@ public:
                 pose_.vecPosition[row]=filteredPosition_[row];
             }
             positionReady_=true;
-        } else {positionReady_=false;accelReady_=false;}
+        } else {positionReady_=false;}
         pose_.result=(fresh&&hmd.bPoseIsValid)?TrackingResult_Running_OK:TrackingResult_Running_OutOfRange;
         pose_.poseIsValid=hmd.bPoseIsValid; pose_.deviceIsConnected=true; pose_.willDriftInYaw=true;
         VRServerDriverHost()->TrackedDevicePoseUpdated(id_,pose_,sizeof(pose_));
@@ -184,7 +159,6 @@ private:
         q.x=copysign(q.x,m.m[2][1]-m.m[1][2]);q.y=copysign(q.y,m.m[0][2]-m.m[2][0]);q.z=copysign(q.z,m.m[1][0]-m.m[0][1]);
         return q;
     }
-    HmdQuaternion_t filteredAccelTilt_{1,0,0,0}; double accelDelta_[3]{}; HmdQuaternion_t accelCenter_{1,0,0,0}; bool accelReady_{false};
     Clock::time_point lastSmooth_{Clock::now()}; HmdQuaternion_t smoothHand_{1,0,0,0}; bool smoothReady_{false};
     double filteredPosition_[3]{}; bool positionReady_{false};
     HmdQuaternion_t nunchukCenter_{1,0,0,0}; bool centerHeld_{false};
