@@ -13,8 +13,8 @@ from pathlib import Path
 
 VID, PIDS, REPORT = 0x057E, (0x0306, 0x0330), 0x37
 PIPE = r"\\.\pipe\WiiMotionSteamVR"
-FRAME = struct.Struct("<IHHQIH H ffff fff ff B3x")
-MAGIC, VERSION, CONNECTED, HAS_NUNCHUK = 0x31534D57, 1, 1, 2
+FRAME = struct.Struct("<IHHQIH H ffff fff ff B3B")
+MAGIC, VERSION, CONNECTED, HAS_NUNCHUK = 0x31534D57, 2, 1, 2
 log = logging.getLogger("WiiMotionSteamVR")
 
 def decode_buttons(report: bytes) -> int:
@@ -128,9 +128,9 @@ def gravity_direction(ax,ay,az):
     if n<20 or n>900: return (0.,0.,0.)
     return (ax/n,ay/n,az/n)
 
-def pack_frame(seq, flags, timestamp, buttons, q, accel, stick, nc_buttons):
+def pack_frame(seq, flags, timestamp, buttons, q, accel, stick, nc_buttons, remote_accel=(128,128,128)):
     return FRAME.pack(MAGIC,VERSION,FRAME.size,timestamp,seq,flags,buttons,
-                      q.w,q.x,q.y,q.z,*accel,*stick,nc_buttons)
+                      q.w,q.x,q.y,q.z,*accel,*stick,nc_buttons,*(int(v) for v in remote_accel))
 
 def report_devices(hid):
     return [d for d in hid.enumerate(VID,0) if d.get("product_id") in PIDS]
@@ -250,7 +250,7 @@ def main():
                     nc_buttons=int(c)|(int(z)<<1)
                     flags=CONNECTED|(HAS_NUNCHUK if now-nc_seen<.5 else 0)
                     dz=min(.45,max(0.,float(cfg.get("stick_deadzone",.08))))
-                    packet=pack_frame(seq,flags,time.perf_counter_ns(),buttons,gyro.q,gravity_direction(ax-512,ay-512,az-512),(axis(sx,dz=dz),axis(sy,dz=dz)),nc_buttons)
+                    packet=pack_frame(seq,flags,time.perf_counter_ns(),buttons,gyro.q,gravity_direction(ax-512,ay-512,az-512),(axis(sx,dz=dz),axis(sy,dz=dz)),nc_buttons,report[3:6])
                     seq=(seq+1)&0xffffffff
                     with latest_lock:latest_packet=packet
                     if gyro.ready and not reported_calibration:

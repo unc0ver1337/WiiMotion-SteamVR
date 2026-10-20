@@ -6,7 +6,7 @@
 
 namespace wms {
 constexpr uint32_t kMagic = 0x31534D57; // WMS1
-constexpr uint16_t kVersion = 1;
+constexpr uint16_t kVersion = 2;
 constexpr uint16_t kFlagConnected = 1;
 constexpr uint16_t kFlagNunchuk = 2;
 #pragma pack(push, 1)
@@ -22,7 +22,7 @@ struct Frame {
     float nunchuk_ax{}, nunchuk_ay{}, nunchuk_az{}; // normalized gravity direction
     float stick_x{}, stick_y{};
     uint8_t nunchuk_buttons{}; // bit0 C, bit1 Z
-    uint8_t reserved[3]{};
+    uint8_t remote_accel[3]{128,128,128}; // raw Wii accelerometer, IPC v2
 };
 #pragma pack(pop)
 static_assert(sizeof(Frame) == 64);
