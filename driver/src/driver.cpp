@@ -78,7 +78,7 @@ public:
         const auto sampleTime=Clock::now();
         double dt=std::chrono::duration<double>(sampleTime-lastSmooth_).count(); lastSmooth_=sampleTime;
         dt=(std::max)(0.,(std::min)(.1,dt));
-        const double alpha=1.-exp(-dt/.045);
+        const double alpha=1.-exp(-dt/.010);
         if(right_ || !fresh || !smoothReady_ || centerEdge) smoothHand_=hand;
         else {
             const double dot=smoothHand_.w*hand.w+smoothHand_.x*hand.x+smoothHand_.y*hand.y+smoothHand_.z*hand.z;
@@ -106,36 +106,30 @@ public:
                             -drop*2*(hand.y*hand.z+hand.w*hand.x);
             double delta[3]={dx,dy,dz};
             if(right_) {
-                // Rotate raw acceleration into the orientation reference frame.
-                // A slow baseline removes gravity and sensor offset; the spring
-                // deliberately returns displacement to neutral after a gesture.
-                const double x=qi.x,y=qi.y,z=qi.z,w=qi.w;
-                const double a[3]={double(f.remote_accel[0])-128.,double(f.remote_accel[1])-128.,double(f.remote_accel[2])-128.};
-                const double aw[3]={
-                    (1-2*(y*y+z*z))*a[0]+2*(x*y-w*z)*a[1]+2*(x*z+w*y)*a[2],
-                    2*(x*y+w*z)*a[0]+(1-2*(x*x+z*z))*a[1]+2*(y*z-w*x)*a[2],
-                    2*(x*z-w*y)*a[0]+2*(y*z+w*x)*a[1]+(1-2*(x*x+y*y))*a[2]};
-                if(!accelReady_ || centerEdge) {
-                    for(int i=0;i<3;++i){accelBase_[i]=aw[i];gesturePosition_[i]=gestureVelocity_[i]=0.;}
-                    accelReady_=true;
+                // Same accelerometer tilt arm model as Nunchuk; gyro still aims.
+                const double ax=double(f.remote_accel[0])-128.;
+                const double ay=double(f.remote_accel[1])-128.;
+                const double az=double(f.remote_accel[2])-128.;
+                const double n=sqrt(ax*ax+ay*ay+az*az);
+                if(n>15. && n<110.) {
+                    const double w=1.+ay/n,x=-az/n,z=ax/n;
+                    const double qn=sqrt(w*w+x*x+z*z);
+                    HmdQuaternion_t tilt=qn>1e-5?HmdQuaternion_t{w/qn,x/qn,0,z/qn}:HmdQuaternion_t{0,1,0,0};
+                    if(!accelReady_ || centerEdge) {
+                        accelCenter_={tilt.w,-tilt.x,-tilt.y,-tilt.z};accelReady_=true;
+                    }
+                    tilt=multiply(accelCenter_,tilt);tilt.x=-tilt.x;
+                    accelDelta_[0]=-length*2*(tilt.x*tilt.z+tilt.w*tilt.y)-drop*2*(tilt.x*tilt.y-tilt.w*tilt.z);
+                    accelDelta_[1]=-length*2*(tilt.y*tilt.z-tilt.w*tilt.x)+drop*2*(tilt.x*tilt.x+tilt.z*tilt.z);
+                    accelDelta_[2]=length*2*(tilt.x*tilt.x+tilt.y*tilt.y)-drop*2*(tilt.y*tilt.z+tilt.w*tilt.x);
                 }
-                const double baseAlpha=1.-exp(-dt/.65);
-                for(int i=0;i<3;++i) {
-                    accelBase_[i]+=baseAlpha*(aw[i]-accelBase_[i]);
-                    double acceleration=(aw[i]-accelBase_[i])*.35;
-                    if(fabs(acceleration)<.3) acceleration=0.;
-                    acceleration=(std::max)(-8.,(std::min)(8.,acceleration));
-                    gestureVelocity_[i]+=(acceleration-9.*gestureVelocity_[i]-20.*gesturePosition_[i])*dt;
-                    gesturePosition_[i]=(std::max)(-.18,(std::min)(.18,gesturePosition_[i]+gestureVelocity_[i]*dt));
-                }
-                // Right hand position follows acceleration, independently of aim.
-                delta[0]=gesturePosition_[0];delta[1]=-gesturePosition_[1];delta[2]=gesturePosition_[2];
+                for(int i=0;i<3;++i) delta[i]=accelDelta_[i];
             }
             for(int row=0;row<3;++row) {
                 double target=pose_.vecPosition[row];
                 for(int col=0;col<3;++col) target+=m.m[row][col]*delta[col];
                 if(!positionReady_) filteredPosition_[row]=target;
-                const double step=(1.-exp(-dt/(right_?.012:.035)))*(target-filteredPosition_[row]);
+                const double step=(1.-exp(-dt/.008))*(target-filteredPosition_[row]);
                 filteredPosition_[row]+=step;
                 pose_.vecPosition[row]=filteredPosition_[row];
             }
@@ -185,7 +179,7 @@ private:
         q.x=copysign(q.x,m.m[2][1]-m.m[1][2]);q.y=copysign(q.y,m.m[0][2]-m.m[2][0]);q.z=copysign(q.z,m.m[1][0]-m.m[0][1]);
         return q;
     }
-    double accelBase_[3]{},gesturePosition_[3]{},gestureVelocity_[3]{}; bool accelReady_{false};
+    double accelDelta_[3]{}; HmdQuaternion_t accelCenter_{1,0,0,0}; bool accelReady_{false};
     Clock::time_point lastSmooth_{Clock::now()}; HmdQuaternion_t smoothHand_{1,0,0,0}; bool smoothReady_{false};
     double filteredPosition_[3]{}; bool positionReady_{false};
     HmdQuaternion_t nunchukCenter_{1,0,0,0}; bool centerHeld_{false};
