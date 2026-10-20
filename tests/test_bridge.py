@@ -42,6 +42,12 @@ class BridgeTests(unittest.TestCase):
         self.assertTrue(g.ready)
         rotated=g.q.rotate((1.,0.,0.))
         self.assertAlmostEqual(rotated[0],0.,places=5);self.assertAlmostEqual(rotated[1],1.,places=5)
+    def test_remote_acceleration_is_separate_from_orientation(self):
+        q=b.Quaternion();q.integrate((.3,.2,-.1),.05)
+        first=b.FRAME.unpack(b.pack_frame(1,b.CONNECTED,100,0,q,(0,1,0),(0,0),0,(100,150,200)))
+        second=b.FRAME.unpack(b.pack_frame(2,b.CONNECTED,200,0,q,(0,1,0),(0,0),0,(200,90,120)))
+        self.assertEqual(first[7:11],second[7:11])
+        self.assertEqual(first[-3:],(100,150,200));self.assertEqual(second[-3:],(200,90,120))
     def test_disconnect_frame_clears_actions(self):
         values=b.FRAME.unpack(b.pack_frame(6,0,900,0,b.Quaternion(),(0,0,0),(0,0),0))
         self.assertEqual(values[5],0);self.assertEqual(values[6],0);self.assertEqual(values[-4],0);self.assertEqual(values[-3:],(128,128,128))

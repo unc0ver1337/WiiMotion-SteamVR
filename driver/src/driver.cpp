@@ -129,7 +129,7 @@ public:
                     gesturePosition_[i]=(std::max)(-.18,(std::min)(.18,gesturePosition_[i]+gestureVelocity_[i]*dt));
                 }
                 // Right hand position follows acceleration, independently of aim.
-                delta[0]=dx+.35*gesturePosition_[0];delta[1]=dy-.35*gesturePosition_[1];delta[2]=dz+.35*gesturePosition_[2];
+                delta[0]=gesturePosition_[0];delta[1]=-gesturePosition_[1];delta[2]=gesturePosition_[2];
             }
             for(int row=0;row<3;++row) {
                 double target=pose_.vecPosition[row];
