@@ -72,14 +72,16 @@ public:
             } else hand={1,0,0,0};
             if(centerEdge) nunchukCenter_={hand.w,-hand.x,-hand.y,-hand.z};
             hand=multiply(nunchukCenter_,hand);
+            // Mirror the Nunchuk lateral sensor axis into the hand frame.
+            hand.y=-hand.y; hand.z=-hand.z;
         }
         // Physical downward pitch must point the virtual wand downward.
         hand.x=-hand.x;
         const auto sampleTime=Clock::now();
         double dt=std::chrono::duration<double>(sampleTime-lastSmooth_).count(); lastSmooth_=sampleTime;
         dt=(std::max)(0.,(std::min)(.1,dt));
-        const double alpha=1.-exp(-dt/.010);
-        if(right_ || !fresh || !smoothReady_ || centerEdge) smoothHand_=hand;
+        const double alpha=1.-exp(-dt/(right_?.020:.028));
+        if(!fresh || !smoothReady_ || centerEdge) smoothHand_=hand;
         else {
             const double dot=smoothHand_.w*hand.w+smoothHand_.x*hand.x+smoothHand_.y*hand.y+smoothHand_.z*hand.z;
             const double sign=dot<0?-1.:1.;
@@ -129,7 +131,7 @@ public:
                 double target=pose_.vecPosition[row];
                 for(int col=0;col<3;++col) target+=m.m[row][col]*delta[col];
                 if(!positionReady_) filteredPosition_[row]=target;
-                const double step=(1.-exp(-dt/.008))*(target-filteredPosition_[row]);
+                const double step=(1.-exp(-dt/.022))*(target-filteredPosition_[row]);
                 filteredPosition_[row]+=step;
                 pose_.vecPosition[row]=filteredPosition_[row];
             }

@@ -34,3 +34,5 @@ Visual Studio 2022 C++ tools, CMake 3.20+, Python 3.12 and Git are required. Run
 MIT project code. OpenVR headers are fetched from Valve at a pinned revision. hidapi uses its upstream BSD license; PyInstaller uses GPL with bootloader exception. Nintendo, HTC Vive and SteamVR belong to their respective owners.
 
 Right-hand acceleration gesture mode: IPC v2 carries raw remote acceleration. Aim remains gyro based; right-hand translation uses a damped, bounded acceleration response (18 cm per axis) that returns to neutral. This is virtual gesture displacement, not persistent measured position. Recenter 1+2 clears displacement.
+
+Current filter tuning: right gyro orientation 20 ms, Nunchuk tilt orientation 28 ms, both positions 22 ms exponential time constants. Recenter resets orientation filtering. Nunchuk lateral sensor direction is mirrored to match physical hand tilt. These constants are not measured end-to-end latency.
