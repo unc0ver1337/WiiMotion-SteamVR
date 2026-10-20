@@ -71,7 +71,7 @@ class Quaternion:
 class Gyro:
     def __init__(self,gravity_gain=.015,sensitivity=1.,max_rate=12.):
         self.bias=[0.,0.,0.]; self.count=0; self.ready=False; self.q=Quaternion(); self.last=None
-        self.samples=[];self.accel_sum=[0.,0.,0.];self.accel_count=0
+        self.gravity_norm=None;self.samples=[];self.accel_sum=[0.,0.,0.];self.accel_count=0
         self.gravity_gain=min(3.,max(0.,float(gravity_gain)));self.sensitivity=min(4.,max(.1,float(sensitivity)));self.max_rate=min(20.,max(2.,float(max_rate)))
     def update(self,d,now,accel):
         raw,slow=decode_gyro(d)
@@ -91,7 +91,9 @@ class Gyro:
                         self.ready=True
                         if self.accel_count:
                             av=[v/self.accel_count for v in self.accel_sum];n=math.sqrt(sum(v*v for v in av))
-                            if n>0:self.q.set(Quaternion.from_to(tuple(v/n for v in av),(0.,1.,0.)))
+                            if n>0:
+                                self.gravity_norm=n
+                                self.q.set(Quaternion.from_to(tuple(v/n for v in av),(0.,1.,0.)))
             self.last=now; return True
         dt=now-self.last if self.last is not None else 0; self.last=now
         if not 0<dt<.1: return True
@@ -100,7 +102,7 @@ class Gyro:
         if mag>self.max_rate: rates=[v*self.max_rate/mag for v in rates]
         self.q.integrate(rates,dt)
         av=tuple(float(v-128) for v in accel);an=math.sqrt(sum(v*v for v in av))
-        if self.gravity_gain and 15<=an<=110:
+        if self.gravity_gain and 15<=an<=110 and self.gravity_norm and abs(an/self.gravity_norm-1.)<.2:
             aw=self.q.rotate(tuple(v/an for v in av));ex,ey,ez=-aw[2],0.,aw[0]
             en=math.sqrt(ex*ex+ey*ey+ez*ez)
             if en>1e-6:
