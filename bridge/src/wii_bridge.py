@@ -72,7 +72,7 @@ class Gyro:
     def __init__(self,gravity_gain=.015,sensitivity=1.,max_rate=12.):
         self.bias=[0.,0.,0.]; self.count=0; self.ready=False; self.q=Quaternion(); self.last=None
         self.samples=[];self.accel_sum=[0.,0.,0.];self.accel_count=0
-        self.gravity_gain=min(.1,max(0.,float(gravity_gain)));self.sensitivity=min(4.,max(.1,float(sensitivity)));self.max_rate=min(20.,max(2.,float(max_rate)))
+        self.gravity_gain=min(3.,max(0.,float(gravity_gain)));self.sensitivity=min(4.,max(.1,float(sensitivity)));self.max_rate=min(20.,max(2.,float(max_rate)))
     def update(self,d,now,accel):
         raw,slow=decode_gyro(d)
         if any(v<1000 or v>15000 for v in raw): return False
@@ -218,9 +218,10 @@ def main():
                 # Enumeration is VID/PID filtered; a process-wide mutex prevents a second bridge opening HID.
                 remote=hid.device(); remote.open_path(devices[0]["path"]); remote.set_nonblocking(False)
                 log.info("Connected Wii Remote PID 0x%04X",devices[0]["product_id"])
-                initialize(remote); log.info("Accelerometer-only mode; MotionPlus passthrough retained for Nunchuk transport")
+                initialize(remote); log.info("Gyro + accelerometer fusion: hold Wii Remote still for bias calibration")
                 nunchuk=(128,128,512,512,512,False,False); nc_seen=0
-                orientation=Quaternion()
+                gyro=Gyro(gravity_gain=1.2)
+                orientation=gyro.q
                 last=lastgyro=time.monotonic(); reported_nunchuk=False; reported_calibration=False
                 nunchuk_wait=last; reported_missing_nunchuk=False; previous_buttons=0
                 while True:
@@ -231,10 +232,11 @@ def main():
                         if now-lastgyro>1.0: raise RuntimeError("No valid MotionPlus gyro packets for one second; retrying device")
                         continue
                     last=now; buttons=decode_buttons(report)
-                    if (buttons & 3)==3 and (previous_buttons & 3)!=3: orientation.reset()
                     previous_buttons=buttons
                     if d is not None and d[5]&2:
-                        lastgyro=now # transport health only; angular-rate values are unused
+                        if gyro.update(d,now,report[3:6]): lastgyro=now
+                        if gyro.ready and not reported_calibration:
+                            log.info("Gyroscope calibrated; gravity-corrected orientation active");reported_calibration=True
                     elif d is not None:
                         nunchuk=decode_nunchuk(d); nc_seen=now
                         if not reported_nunchuk:

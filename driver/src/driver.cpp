@@ -80,7 +80,15 @@ public:
         const double alpha=1.-exp(-dt/.028);
         smoothHand_=filterQuaternion(smoothHand_,hand,alpha,!fresh || !smoothReady_ || centerEdge);
         smoothReady_=fresh; hand=smoothHand_;
-        pose_.qRotation=fresh?multiply(qh,hand):qh;
+        HmdQuaternion_t aim=hand;
+        if(right_) {
+            HmdQuaternion_t fused{f.q_w,f.q_x,f.q_y,f.q_z};
+            if(centerEdge) fusedCenter_={fused.w,-fused.x,-fused.y,-fused.z};
+            fused=multiply(fusedCenter_,fused); fused.x=-fused.x; fused.y=-fused.y;
+            fusedSmooth_=filterQuaternion(fusedSmooth_,fused,alpha,!fresh || !fusedReady_ || centerEdge);
+            fusedReady_=fresh;aim=fusedSmooth_;
+        }
+        pose_.qRotation=fresh?multiply(qh,aim):qh;
         // Virtual forearm: rotation changes the endpoint around a fixed elbow.
         // This is an arm model, not measured translational tracking.
         if(fresh && hmd.bPoseIsValid) {
@@ -159,6 +167,7 @@ private:
         q.x=copysign(q.x,m.m[2][1]-m.m[1][2]);q.y=copysign(q.y,m.m[0][2]-m.m[2][0]);q.z=copysign(q.z,m.m[1][0]-m.m[0][1]);
         return q;
     }
+    HmdQuaternion_t fusedCenter_{1,0,0,0},fusedSmooth_{1,0,0,0}; bool fusedReady_{false};
     Clock::time_point lastSmooth_{Clock::now()}; HmdQuaternion_t smoothHand_{1,0,0,0}; bool smoothReady_{false};
     double filteredPosition_[3]{}; bool positionReady_{false};
     HmdQuaternion_t nunchukCenter_{1,0,0,0}; bool centerHeld_{false};

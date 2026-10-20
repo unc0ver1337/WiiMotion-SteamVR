@@ -53,6 +53,13 @@ class BridgeTests(unittest.TestCase):
             self.assertGreater(abs(q[quaternion_axis]),.001)
             for axis in (1,2,3):
                 if axis!=quaternion_axis:self.assertAlmostEqual(q[axis],0.,places=6)
+    def test_gravity_correction_reduces_tilt_error(self):
+        g=b.Gyro(gravity_gain=1.2)
+        for i in range(70):g.update(gyro(),i*.01,(128,178,128))
+        for _ in range(40):g.q.integrate((.4,0,0),.025)
+        before=abs(g.q.rotate((0,1,0))[2])
+        for i in range(70,370):g.update(gyro(),i*.01,(128,178,128))
+        self.assertLess(abs(g.q.rotate((0,1,0))[2]),before*.15)
     def test_remote_acceleration_is_separate_from_orientation(self):
         q=b.Quaternion();q.integrate((.3,.2,-.1),.05)
         first=b.FRAME.unpack(b.pack_frame(1,b.CONNECTED,100,0,q,(0,1,0),(0,0),0,(100,150,200)))
