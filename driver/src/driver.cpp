@@ -86,7 +86,12 @@ public:
             if(centerEdge) fusedCenter_={fused.w,-fused.x,-fused.y,-fused.z};
             fused=multiply(fusedCenter_,fused); fused.x=-fused.x; fused.y=-fused.y;
             fusedSmooth_=filterQuaternion(fusedSmooth_,fused,alpha,!fresh || !fusedReady_ || centerEdge);
-            fusedReady_=fresh;aim=fusedSmooth_;
+            fusedReady_=fresh;
+            // Accelerometer directly anchors tilt; gyro contributes heading only.
+            const auto& q=fusedSmooth_;
+            const double yaw=atan2(2.*(q.w*q.y+q.x*q.z),1.-2.*(q.y*q.y+q.x*q.x));
+            HmdQuaternion_t heading{cos(yaw*.5),0,sin(yaw*.5),0};
+            aim=multiply(heading,hand);
         }
         pose_.qRotation=fresh?multiply(qh,aim):qh;
         // Virtual forearm: rotation changes the endpoint around a fixed elbow.
