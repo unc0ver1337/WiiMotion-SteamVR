@@ -75,21 +75,12 @@ public:
         }
         // Physical downward pitch must point the virtual wand downward.
         hand.x=-hand.x;
+        if(right_) hand.y=-hand.y; // Reverse gyro yaw only, not accelerometer position.
         const auto sampleTime=Clock::now();
         double dt=std::chrono::duration<double>(sampleTime-lastSmooth_).count(); lastSmooth_=sampleTime;
         dt=(std::max)(0.,(std::min)(.1,dt));
         const double alpha=1.-exp(-dt/.028);
-        if(!fresh || !smoothReady_ || centerEdge) smoothHand_=hand;
-        else {
-            const double dot=smoothHand_.w*hand.w+smoothHand_.x*hand.x+smoothHand_.y*hand.y+smoothHand_.z*hand.z;
-            const double sign=dot<0?-1.:1.;
-            smoothHand_={smoothHand_.w*(1-alpha)+sign*hand.w*alpha,
-                         smoothHand_.x*(1-alpha)+sign*hand.x*alpha,
-                         smoothHand_.y*(1-alpha)+sign*hand.y*alpha,
-                         smoothHand_.z*(1-alpha)+sign*hand.z*alpha};
-            const double n=sqrt(smoothHand_.w*smoothHand_.w+smoothHand_.x*smoothHand_.x+smoothHand_.y*smoothHand_.y+smoothHand_.z*smoothHand_.z);
-            if(n>1e-9) smoothHand_={smoothHand_.w/n,smoothHand_.x/n,smoothHand_.y/n,smoothHand_.z/n};
-        }
+        smoothHand_=filterQuaternion(smoothHand_,hand,alpha,!fresh || !smoothReady_ || centerEdge);
         smoothReady_=fresh; hand=smoothHand_;
         pose_.qRotation=fresh?multiply(qh,hand):qh;
         // Virtual forearm: rotation changes the endpoint around a fixed elbow.
@@ -115,10 +106,13 @@ public:
                     const double w=1.+ay/n,x=-az/n,z=ax/n;
                     const double qn=sqrt(w*w+x*x+z*z);
                     HmdQuaternion_t tilt=qn>1e-5?HmdQuaternion_t{w/qn,x/qn,0,z/qn}:HmdQuaternion_t{0,1,0,0};
-                    if(!accelReady_ || centerEdge) {
+                    const bool resetTilt=!accelReady_ || centerEdge;
+                    if(resetTilt) {
                         accelCenter_={tilt.w,-tilt.x,-tilt.y,-tilt.z};accelReady_=true;
                     }
                     tilt=multiply(accelCenter_,tilt);tilt.x=-tilt.x;
+                    filteredAccelTilt_=filterQuaternion(filteredAccelTilt_,tilt,alpha,resetTilt);
+                    tilt=filteredAccelTilt_;
                     accelDelta_[0]=-length*2*(tilt.x*tilt.z+tilt.w*tilt.y)-drop*2*(tilt.x*tilt.y-tilt.w*tilt.z);
                     accelDelta_[1]=-length*2*(tilt.y*tilt.z-tilt.w*tilt.x)+drop*2*(tilt.x*tilt.x+tilt.z*tilt.z);
                     accelDelta_[2]=length*2*(tilt.x*tilt.x+tilt.y*tilt.y)-drop*2*(tilt.y*tilt.z+tilt.w*tilt.x);
@@ -166,6 +160,17 @@ public:
         VRDriverInput()->UpdateScalarComponent(padY_,float(y),0);
     }
 private:
+    static HmdQuaternion_t filterQuaternion(HmdQuaternion_t previous,HmdQuaternion_t target,double alpha,bool reset) {
+        if(reset) return target;
+        const double dot=previous.w*target.w+previous.x*target.x+previous.y*target.y+previous.z*target.z;
+        const double sign=dot<0?-1.:1.;
+        HmdQuaternion_t q{previous.w*(1-alpha)+sign*target.w*alpha,
+                         previous.x*(1-alpha)+sign*target.x*alpha,
+                         previous.y*(1-alpha)+sign*target.y*alpha,
+                         previous.z*(1-alpha)+sign*target.z*alpha};
+        const double n=sqrt(q.w*q.w+q.x*q.x+q.y*q.y+q.z*q.z);
+        return n>1e-9?HmdQuaternion_t{q.w/n,q.x/n,q.y/n,q.z/n}:target;
+    }
     static HmdQuaternion_t multiply(const HmdQuaternion_t&a,const HmdQuaternion_t&b) {
         return {a.w*b.w-a.x*b.x-a.y*b.y-a.z*b.z,a.w*b.x+a.x*b.w+a.y*b.z-a.z*b.y,
                 a.w*b.y-a.x*b.z+a.y*b.w+a.z*b.x,a.w*b.z+a.x*b.y-a.y*b.x+a.z*b.w};
@@ -179,7 +184,7 @@ private:
         q.x=copysign(q.x,m.m[2][1]-m.m[1][2]);q.y=copysign(q.y,m.m[0][2]-m.m[2][0]);q.z=copysign(q.z,m.m[1][0]-m.m[0][1]);
         return q;
     }
-    double accelDelta_[3]{}; HmdQuaternion_t accelCenter_{1,0,0,0}; bool accelReady_{false};
+    HmdQuaternion_t filteredAccelTilt_{1,0,0,0}; double accelDelta_[3]{}; HmdQuaternion_t accelCenter_{1,0,0,0}; bool accelReady_{false};
     Clock::time_point lastSmooth_{Clock::now()}; HmdQuaternion_t smoothHand_{1,0,0,0}; bool smoothReady_{false};
     double filteredPosition_[3]{}; bool positionReady_{false};
     HmdQuaternion_t nunchukCenter_{1,0,0,0}; bool centerHeld_{false};
