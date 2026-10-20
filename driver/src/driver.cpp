@@ -78,8 +78,8 @@ public:
         const auto sampleTime=Clock::now();
         double dt=std::chrono::duration<double>(sampleTime-lastSmooth_).count(); lastSmooth_=sampleTime;
         dt=(std::max)(0.,(std::min)(.1,dt));
-        const double alpha=1.-exp(-dt/(right_?.025:.045));
-        if(!fresh || !smoothReady_ || centerEdge) smoothHand_=hand;
+        const double alpha=1.-exp(-dt/.045);
+        if(right_ || !fresh || !smoothReady_ || centerEdge) smoothHand_=hand;
         else {
             const double dot=smoothHand_.w*hand.w+smoothHand_.x*hand.x+smoothHand_.y*hand.y+smoothHand_.z*hand.z;
             const double sign=dot<0?-1.:1.;
@@ -129,13 +129,13 @@ public:
                     gesturePosition_[i]=(std::max)(-.18,(std::min)(.18,gesturePosition_[i]+gestureVelocity_[i]*dt));
                 }
                 // Right hand position follows acceleration, independently of aim.
-                delta[0]=gesturePosition_[0];delta[1]=-gesturePosition_[1];delta[2]=gesturePosition_[2];
+                delta[0]=dx+.35*gesturePosition_[0];delta[1]=dy-.35*gesturePosition_[1];delta[2]=dz+.35*gesturePosition_[2];
             }
             for(int row=0;row<3;++row) {
                 double target=pose_.vecPosition[row];
                 for(int col=0;col<3;++col) target+=m.m[row][col]*delta[col];
                 if(!positionReady_) filteredPosition_[row]=target;
-                const double step=(1.-exp(-dt/.035))*(target-filteredPosition_[row]);
+                const double step=(1.-exp(-dt/(right_?.012:.035)))*(target-filteredPosition_[row]);
                 filteredPosition_[row]+=step;
                 pose_.vecPosition[row]=filteredPosition_[row];
             }
@@ -161,7 +161,7 @@ public:
             }
             t=trigger?1.:0.;
         }
-        VRDriverInput()->UpdateBooleanComponent(system_,fresh && (f.buttons & (right_?0x0001:0x0002)),0);
+        VRDriverInput()->UpdateBooleanComponent(system_,fresh && (f.buttons & (right_?0x0002:0x0001)),0);
         VRDriverInput()->UpdateBooleanComponent(padTouch_,fresh && (right_?padclick:(x*x+y*y>.001)),0);
         VRDriverInput()->UpdateBooleanComponent(trigger_,trigger,0);
         VRDriverInput()->UpdateScalarComponent(triggerValue_,float(t),0);
